@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DuelForge</title>
+<link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">⚔</span> DUELFORGE</div>
+    <div class="player-pill">PLAYER <b id="playerName">AFTAB</b></div>
+  </header>
+
+  <main>
+    <section id="home" class="screen active">
+      <div class="hero">
+        <div class="eyebrow">⚡ ARENA SEASON 01</div>
+        <h1>FORGE YOUR<br><span>LEGEND.</span></h1>
+        <p>Best-of-7 duels. A new weapon every round. Adapt or fall.</p>
+        <div class="home-stats">
+          <div><b id="homeWins">0</b><small>WINS</small></div>
+          <div><b id="homeCoins">500</b><small>COINS</small></div>
+          <div><b id="homeRank">#—</b><small>RANK</small></div>
+        </div>
+        <div class="home-actions">
+          <button class="primary" id="botBtn">⚔ PLAY BOT</button>
+          <button class="secondary" id="challengeBtn">👤 CHALLENGE PLAYER</button>
+          <button class="ghost" id="leaderBtn">🏆 LEADERBOARD</button>
+        </div>
+      </div>
+      <div class="forge-card">
+        <div class="card-title">HOW IT WORKS</div>
+        <div class="steps">
+          <div><span>01</span><b>DUEL</b><small>Best of 7</small></div>
+          <div><span>02</span><b>ADAPT</b><small>Weapon changes</small></div>
+          <div><span>03</span><b>WIN</b><small>Earn coins</small></div>
+          <div><span>04</span><b>RISE</b><small>Climb the board</small></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="challenge" class="screen">
+      <div class="panel narrow">
+        <button class="back" data-home>← BACK</button>
+        <div class="eyebrow">DUEL REQUEST</div>
+        <h2>Challenge a fighter.</h2>
+        <p>Enter their username. In this MVP, the request is simulated locally.</p>
+        <input id="targetName" maxlength="20" placeholder="@username" autocomplete="off">
+        <button class="primary full" id="sendChallenge">SEND DUEL REQUEST</button>
+        <div id="challengeMsg" class="message"></div>
+      </div>
+    </section>
+
+    <section id="leaderboard" class="screen">
+      <div class="panel">
+        <button class="back" data-home>← BACK</button>
+        <div class="eyebrow">GLOBAL RANKINGS</div>
+        <h2>Hall of Fighters</h2>
+        <p>Ranked by wins, then coins.</p>
+        <div id="board" class="board"></div>
+      </div>
+    </section>
+
+    <section id="duel" class="screen">
+      <div class="duel-head">
+        <button class="back" id="quitDuel">← QUIT</button>
+        <div class="round-label">ROUND <b id="roundNo">1</b> / 7</div>
+        <div class="scoreline"><b id="myRounds">0</b> — <b id="botRounds">0</b></div>
+      </div>
+      <div class="arena">
+        <div class="moon"></div>
+        <div class="stars"></div>
+        <div class="mountains back-mountains"></div>
+        <div class="mountains front-mountains"></div>
+        <div class="ground"></div>
+
+        <div class="fighter enemy" id="enemy">
+          <div class="nameplate"><b id="enemyName">IRON WRAITH</b><span id="enemyHpText">100</span></div>
+          <div class="health"><i id="enemyHp"></i></div>
+          <div class="fighter-art enemy-art">
+            <div class="cape"></div><div class="head"></div><div class="body"></div>
+            <div class="arm a1"></div><div class="arm a2"></div><div class="leg l1"></div><div class="leg l2"></div>
+            <div class="blade"></div>
+          </div>
+        </div>
+
+        <div class="fighter hero-fighter" id="heroFighter">
+          <div class="nameplate"><b id="heroName">AFTAB</b><span id="heroHpText">100</span></div>
+          <div class="health"><i id="heroHp"></i></div>
+          <div class="fighter-art hero-art">
+            <div class="cape"></div><div class="head"></div><div class="body"></div>
+            <div class="arm a1"></div><div class="arm a2"></div><div class="leg l1"></div><div class="leg l2"></div>
+            <div class="blade"></div>
+          </div>
+        </div>
+
+        <div class="weapon-card enemy-weapon"><small>OPPONENT WEAPON</small><b id="enemyWeapon">SWORD</b></div>
+        <div class="weapon-card hero-weapon"><small>YOUR WEAPON</small><b id="heroWeapon">SWORD</b></div>
+        <div id="hitFlash"></div>
+        <div id="countdown" class="countdown">3</div>
+      </div>
+
+      <div class="combat-ui">
+        <div class="weapon-info">ROUND WEAPON: <b id="weaponInfo">IRON SWORD</b></div>
+        <div class="controls">
+          <button id="leftBtn">◀</button>
+          <button id="blockBtn">🛡 BLOCK</button>
+          <button id="attackBtn" class="attack">⚔ ATTACK</button>
+          <button id="rightBtn">▶</button>
+        </div>
+        <div class="hint">Keyboard: A/D move · Space attack · S block</div>
+      </div>
+    </section>
+
+    <section id="result" class="screen">
+      <div class="result-card">
+        <div id="resultIcon" class="result-icon">🏆</div>
+        <div class="eyebrow" id="resultEyebrow">ROUND WON</div>
+        <h2 id="resultTitle">VICTORY</h2>
+        <div class="final-score"><b id="finalMy">4</b> <span>—</span> <b id="finalBot">2</b></div>
+        <div class="rewards">
+          <div><span>🏆</span><b id="rewardWins">+1</b><small>WIN</small></div>
+          <div><span>🪙</span><b id="rewardCoins">+150</b><small>COINS</small></div>
+        </div>
+        <button class="primary full" id="rematchBtn">⚔ REMATCH</button>
+        <button class="ghost full" id="resultHome">RETURN HOME</button>
+      </div>
+    </section>
+  </main>
+</div>
+<script src="src/game.js"></script>
+</body>
+</html>
