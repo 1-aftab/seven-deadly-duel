@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#070914">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>DuelForge</title>
+<link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">⚔</span> DUELFORGE</div>
+    <div class="top-right">
+      <button id="muteBtn" class="icon-btn" aria-label="Sound">🔊</button>
+      <button class="player-pill" id="namePill" aria-label="Rename">PLAYER <b id="playerName">AFTAB</b> ✎</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="home" class="screen active">
+      <div class="hero">
+        <div class="eyebrow">⚡ ARENA SEASON 01</div>
+        <h1>FORGE YOUR<br><span>LEGEND.</span></h1>
+        <p>Best-of-7 duels. A new weapon every round. Adapt or fall.</p>
+        <div class="home-stats">
+          <div><b id="homeWins">0</b><small>WINS</small></div>
+          <div><b id="homeCoins">500</b><small>COINS</small></div>
+          <div><b id="homeRank">#—</b><small>RANK</small></div>
+        </div>
+        <div class="home-actions">
+          <button class="primary" id="botBtn">⚔ PLAY BOT</button>
+          <button class="secondary" id="challengeBtn">🌐 PLAY A FRIEND (P2P)</button>
+          <button class="ghost" id="leaderBtn">🏆 LEADERBOARD</button>
+        </div>
+      </div>
+      <div class="forge-card">
+        <div class="card-title">HOW IT WORKS</div>
+        <div class="steps">
+          <div><span>01</span><b>DUEL</b><small>Best of 7</small></div>
+          <div><span>02</span><b>ADAPT</b><small>Weapon changes</small></div>
+          <div><span>03</span><b>WIN</b><small>Earn coins</small></div>
+          <div><span>04</span><b>RISE</b><small>Climb the board</small></div>
+        </div>
+        <div class="keys">A/D move · W/Space jump · J attack · L/Shift dash</div>
+      </div>
+    </section>
+
+    <section id="challenge" class="screen">
+      <div class="panel">
+        <button class="back" data-home>← BACK</button>
+        <div class="eyebrow">WEBRTC · PEER-TO-PEER · NO SERVER</div>
+        <h2>Duel a friend.</h2>
+        <p>One of you creates a room and sends the code. The other pastes it, then sends the reply code back. That's the whole handshake.</p>
+        <div class="tabs"><button class="tab active" id="tabHost">CREATE ROOM</button><button class="tab" id="tabJoin">JOIN ROOM</button></div>
+        <div id="hostPane">
+          <button class="primary full" id="mkRoom">GENERATE ROOM CODE</button>
+          <label>1 · SEND THIS CODE TO YOUR FRIEND</label>
+          <textarea id="hostCode" readonly placeholder="Your room code appears here"></textarea>
+          <div class="row-btns"><button class="secondary" id="copyHost">COPY</button><button class="secondary" id="shareHost">SHARE</button></div>
+          <label>2 · PASTE THEIR REPLY CODE</label>
+          <textarea id="hostAnswer" placeholder="Paste reply code"></textarea>
+          <div class="row-btns"><button class="secondary" id="pasteHost">PASTE</button><button class="primary" id="connectHost">CONNECT</button></div>
+        </div>
+        <div id="joinPane" hidden>
+          <label>1 · PASTE THE HOST'S ROOM CODE</label>
+          <textarea id="joinCode" placeholder="Paste room code"></textarea>
+          <div class="row-btns"><button class="secondary" id="pasteJoin">PASTE</button><button class="primary" id="mkAnswer">GENERATE REPLY</button></div>
+          <label>2 · SEND THIS REPLY CODE BACK</label>
+          <textarea id="joinAnswer" readonly placeholder="Your reply code appears here"></textarea>
+          <div class="row-btns"><button class="secondary" id="copyJoin">COPY</button><button class="secondary" id="shareJoin">SHARE</button></div>
+        </div>
+        <div id="netStatus" class="message"></div>
+      </div>
+    </section>
+
+    <section id="leaderboard" class="screen">
+      <div class="panel">
+        <button class="back" data-home>← BACK</button>
+        <div class="eyebrow">RANKINGS</div>
+        <h2>Hall of Fighters</h2>
+        <p>Ranked by wins, then coins.</p>
+        <div id="board" class="board"></div>
+      </div>
+    </section>
+
+    <section id="result" class="screen">
+      <div class="result-card">
+        <div id="resultIcon" class="result-icon">🏆</div>
+        <div class="eyebrow" id="resultEyebrow">DUEL WON</div>
+        <h2 id="resultTitle">VICTORY</h2>
+        <div class="final-score"><b id="finalMy">4</b> <span>—</span> <b id="finalBot">2</b></div>
+        <div class="rewards">
+          <div><span>🏆</span><b id="rewardWins">+1</b><small>WIN</small></div>
+          <div><span>🪙</span><b id="rewardCoins">+150</b><small>COINS</small></div>
+        </div>
+        <div class="reward-note" id="rewardNote"></div>
+        <button class="primary full" id="rematchBtn">⚔ REMATCH</button>
+        <button class="ghost full" id="resultHome">RETURN HOME</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<section id="duel" class="screen">
+  <canvas id="game"></canvas>
+  <div id="hud">
+    <div class="hud-side left">
+      <div class="hud-name"><b id="heroName">AFTAB</b><span class="wchip" id="heroWeapon">SWORD</span></div>
+      <div class="hbar"><i class="ghost" id="heroGhost"></i><i class="fill" id="heroHp"></i><em id="heroHpText">100</em></div>
+      <div class="pips" id="heroPips"></div>
+    </div>
+    <div class="hud-mid">
+      <div class="round-label">ROUND <b id="roundNo">1</b>/7</div>
+      <div id="timer">60</div>
+      <div class="scoreline"><b id="myRounds">0</b> — <b id="botRounds">0</b></div>
+    </div>
+    <div class="hud-side right">
+      <div class="hud-name"><span class="wchip" id="enemyWeapon">SWORD</span><b id="enemyName">IRON WRAITH</b></div>
+      <div class="hbar enemy"><i class="ghost" id="enemyGhost"></i><i class="fill" id="enemyHp"></i><em id="enemyHpText">100</em></div>
+      <div class="pips" id="enemyPips"></div>
+    </div>
+  </div>
+  <button id="pauseBtn" aria-label="Pause">❚❚</button>
+  <div id="intro"></div>
+  <div id="banner"><div id="bannerMain"></div><div id="bannerSub"></div></div>
+  <div id="hitFlash"></div>
+  <div id="touch">
+    <div id="dpad"><button id="leftBtn" aria-label="Left">◀</button><button id="rightBtn" aria-label="Right">▶</button></div>
+    <div id="actions">
+      <button id="dashBtn" class="act dash">DASH</button>
+      <button id="jumpBtn" class="act jump">JUMP</button>
+      <button id="attackBtn" class="act attack">⚔<small>ATTACK</small></button>
+    </div>
+  </div>
+  <div id="pauseMenu" hidden>
+    <div class="pause-card">
+      <h3>PAUSED</h3>
+      <button class="primary full" id="resumeBtn">RESUME</button>
+      <button class="secondary full" id="fsBtn">FULLSCREEN</button>
+      <button class="ghost full" id="quitDuel">QUIT TO HOME</button>
+    </div>
+  </div>
+  <div id="rotate"><div>↻<br>ROTATE YOUR DEVICE<small>DuelForge plays in landscape</small></div></div>
+</section>
+
+<script src="src/weapons.js"></script>
+<script src="src/fx.js"></script>
+<script src="src/fighter.js"></script>
+<script src="src/arena.js"></script>
+<script src="src/bot.js"></script>
+<script src="src/net.js"></script>
+<script src="src/game.js"></script>
+</body>
+</html>
