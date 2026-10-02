@@ -1,4 +1,6 @@
 (function () {
+  'use strict';
+
   let mode = 'signin';
   let initialized = false;
 
@@ -8,7 +10,6 @@
 
   function setMessage(text, type) {
     const el = $('authMessage');
-
     if (!el) return;
 
     el.textContent = text || '';
@@ -20,10 +21,9 @@
   }
 
   function setMode(nextMode) {
-    mode = nextMode;
+    mode = nextMode === 'signup' ? 'signup' : 'signin';
 
     const signup = mode === 'signup';
-
     const title = $('authTitle');
     const subtitle = $('authSubtitle');
     const submit = $('authSubmit');
@@ -31,9 +31,7 @@
     const password = $('authPassword');
 
     if (title) {
-      title.textContent = signup
-        ? 'Create your account'
-        : 'Welcome back';
+      title.textContent = signup ? 'Create your account' : 'Welcome back';
     }
 
     if (subtitle) {
@@ -43,21 +41,19 @@
     }
 
     if (submit) {
-      submit.textContent = signup
-        ? 'CREATE ACCOUNT'
-        : 'SIGN IN';
+      submit.textContent = signup ? 'CREATE ACCOUNT' : 'SIGN IN';
+      submit.disabled = false;
     }
 
     if (toggle) {
       toggle.textContent = signup
         ? 'I ALREADY HAVE AN ACCOUNT'
         : 'CREATE ACCOUNT';
+      toggle.disabled = false;
     }
 
     if (password) {
-      password.autocomplete = signup
-        ? 'new-password'
-        : 'current-password';
+      password.autocomplete = signup ? 'new-password' : 'current-password';
     }
 
     setMessage('');
@@ -81,12 +77,24 @@
     if (password) password.disabled = busy;
   }
 
+  function supabaseClient() {
+    if (
+      window.DF &&
+      window.DF.Supabase &&
+      window.DF.Supabase.auth
+    ) {
+      return window.DF.Supabase;
+    }
+
+    return null;
+  }
+
   async function handleSubmit() {
     const emailInput = $('authEmail');
     const passwordInput = $('authPassword');
 
     if (!emailInput || !passwordInput) {
-      console.error('DuelForge: Auth inputs were not found.');
+      setMessage('Authentication form is missing.', 'error');
       return;
     }
 
@@ -100,30 +108,30 @@
     }
 
     if (!password) {
-      setMessage('Please enter your password.', 'error');
+      setMessage('Please enter a password.', 'error');
       passwordInput.focus();
       return;
     }
 
     if (password.length < 6) {
-      setMessage(
-        'Password must be at least 6 characters.',
-        'error'
-      );
+      setMessage('Password must be at least 6 characters.', 'error');
       passwordInput.focus();
       return;
     }
 
-    if (!window.DF || !DF.Supabase) {
+    const supabase = supabaseClient();
+
+    if (!supabase) {
       setMessage(
-        'Supabase failed to load. Refresh the page and try again.',
+        'Supabase is not loaded. Refresh the page. If this keeps happening, check the Supabase setup below.',
         'error'
       );
-
       console.error(
-        'DuelForge: DF.Supabase is missing.'
+        'DuelForge: Supabase client is unavailable.',
+        window.DF && window.DF.SupabaseError
+          ? window.DF.SupabaseError
+          : ''
       );
-
       return;
     }
 
@@ -132,104 +140,66 @@
 
     try {
       if (mode === 'signup') {
+        const { data, error } = await supabase.auth.signUp({
+          email: email,
+          password: password,
+          options: {
+            emailRedirectTo:
+              window.location.origin + window.location.pathname
+          }
+        });
 
-        const result =
-          await DF.Supabase.auth.signUp({
-            email: email,
-            password: password,
-            options: {
-              emailRedirectTo:
-                window.location.origin +
-                window.location.pathname
-            }
-          });
-
-        const data = result.data;
-        const error = result.error;
-
-        if (error) {
-          throw error;
-        }
+        if (error) throw error;
 
         if (data && data.session) {
-
           setMessage(
             'Account created. Entering the arena...',
             'success'
           );
 
-          if (
-            typeof window.DuelForgeAuthReady ===
-            'function'
-          ) {
+          if (typeof window.DuelForgeAuthReady === 'function') {
             window.DuelForgeAuthReady();
           }
-
         } else {
-
           setMessage(
-            'Account created! Check your email to confirm your account, then sign in.',
+            'Account created. Check your email to confirm your account, then sign in.',
             'success'
           );
-
         }
-
       } else {
-
-        const result =
-          await DF.Supabase.auth.signInWithPassword({
+        const { data, error } =
+          await supabase.auth.signInWithPassword({
             email: email,
             password: password
           });
 
-        const data = result.data;
-        const error = result.error;
-
-        if (error) {
-          throw error;
-        }
+        if (error) throw error;
 
         if (
           data &&
           data.session &&
-          typeof window.DuelForgeAuthReady ===
-            'function'
+          typeof window.DuelForgeAuthReady === 'function'
         ) {
-          setMessage(
-            'Signed in. Entering the arena...',
-            'success'
-          );
-
+          setMessage('Signed in. Entering the arena...', 'success');
           window.DuelForgeAuthReady();
         }
-
       }
-
     } catch (error) {
+      console.error('DuelForge authentication error:', error);
 
-      console.error(
-        'DuelForge authentication error:',
-        error
-      );
-
-      let message =
+      setMessage(
         error && error.message
           ? error.message
-          : String(error);
-
-      setMessage(message, 'error');
-
+          : 'Authentication failed. Please try again.',
+        'error'
+      );
     } finally {
-
       setBusy(false);
-
     }
   }
 
   function initAuth() {
-
     if (initialized) return;
-
     initialized = true;
 
     const screen = $('authScreen');
@@ -238,66 +208,40 @@
     const password = $('authPassword');
 
     if (!screen || !submit || !toggle) {
-
       console.error(
         'DuelForge: Authentication elements are missing from index.html.'
       );
-
       return;
     }
 
-    if (!window.DF || !DF.Supabase) {
-
-      setMessage(
-        'Supabase did not load. Check your internet connection and refresh the page.',
-        'error'
-      );
-
-      console.error(
-        'DuelForge: Supabase is not available.'
-      );
-
-      return;
-    }
-
+    /*
+      IMPORTANT:
+      The mode switch is intentionally initialized WITHOUT requiring
+      Supabase. This means the CREATE ACCOUNT button still works even
+      if the Supabase network/client has failed to load.
+    */
     setMode('signin');
 
-    submit.addEventListener(
-      'click',
-      handleSubmit
-    );
+    submit.addEventListener('click', function (event) {
+      event.preventDefault();
+      handleSubmit();
+    });
 
-    toggle.addEventListener(
-      'click',
-      function () {
-
-        setMode(
-          mode === 'signin'
-            ? 'signup'
-            : 'signin'
-        );
-
-      }
-    );
+    toggle.addEventListener('click', function (event) {
+      event.preventDefault();
+      setMode(mode === 'signin' ? 'signup' : 'signin');
+    });
 
     if (password) {
-
-      password.addEventListener(
-        'keydown',
-        function (event) {
-
-          if (event.key === 'Enter') {
-            handleSubmit();
-          }
-
+      password.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          handleSubmit();
         }
-      );
-
+      });
     }
 
-    console.log(
-      'DuelForge: Authentication initialized.'
-    );
+    console.log('DuelForge: Authentication initialized.');
   }
 
   window.DFAuth = {
@@ -305,19 +249,9 @@
     submit: handleSubmit
   };
 
-  if (
-    document.readyState === 'loading'
-  ) {
-
-    document.addEventListener(
-      'DOMContentLoaded',
-      initAuth
-    );
-
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAuth);
   } else {
-
     initAuth();
-
   }
-
 })();
