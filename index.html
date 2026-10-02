@@ -328,6 +328,14 @@ CANCEL
 </section>
 
 
+<!-- CHARACTER SELECTION -->
+<section id="characterScreen" class="screen">
+<div class="char-wrap">
+<div class="char-head"><div><h2>Choose Your Fighter</h2><p>Pick a character. You can change it anytime from the lobby.</p></div><button class="ghost" id="charBack">BACK</button></div>
+<div id="charGrid" class="char-grid"></div>
+<div id="charDetail" class="char-detail"></div>
+</div></section>
+
 <!-- LOBBY -->
 
 <section id="home" class="screen">
@@ -444,6 +452,13 @@ Best of 7 &middot; choose your weapon every round
 <use href="#i-chev"/>
 </svg>
 
+</button>
+
+
+<button class="mbtn" id="charactersBtn">
+<span class="ico">♟</span>
+<span class="lbl"><b>Characters</b><small>Change your fighter anytime</small></span>
+<svg class="i chev" aria-hidden="true"><use href="#i-chev"/></svg>
 </button>
 
 
@@ -1185,13 +1200,14 @@ DuelForge plays in landscape
 
 <script src="src/weapons.js"></script>
 <script src="src/fx.js"></script>
-<script src="src/fighter.js"></script>
+<script src="src/characters.js?v=20261002c"></script>
+<script src="src/fighter.js?v=20261002c"></script>
 <script src="src/arena.js"></script>
 <script src="src/bot.js"></script>
 <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
 <script src="src/net.js?v=20261002b"></script>
-<script src="src/progression.js?v=20261002b"></script>
-<script src="src/game.js?v=20261002b"></script>
+<script src="src/progression.js?v=20261002c"></script>
+<script src="src/game.js?v=20261002c"></script>
 
 </body>
   </html>
