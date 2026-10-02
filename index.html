@@ -217,7 +217,63 @@
 
   </section>
 
+<!-- ============ AUTHENTICATION ============ -->
 
+<section id="authScreen" class="screen center">
+
+  <div class="card narrow auth-card">
+
+    <svg class="logo-mark md">
+      <use href="#logo"/>
+    </svg>
+
+    <h2 id="authTitle">Welcome back</h2>
+
+    <p class="sub" id="authSubtitle">
+      Sign in to enter the arena.
+    </p>
+
+
+    <input
+      id="authEmail"
+      type="email"
+      autocomplete="email"
+      placeholder="Email"
+      aria-label="Email"
+    >
+
+
+    <input
+      id="authPassword"
+      type="password"
+      autocomplete="current-password"
+      placeholder="Password"
+      aria-label="Password"
+      style="margin-top:8px"
+    >
+
+
+    <div id="authMessage" class="message"></div>
+
+
+    <button
+      class="primary full"
+      id="authSubmit"
+    >
+      SIGN IN
+    </button>
+
+
+    <button
+      class="ghost full"
+      id="authToggle"
+    >
+      CREATE ACCOUNT
+    </button>
+
+  </div>
+
+</section>
   <!-- ============ GAMERTAG ============ -->
 
   <section id="nameScreen" class="screen center">
