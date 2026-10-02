@@ -172,7 +172,20 @@ startPower(G,pow){this.input.heavy=0;const st=pow.stats||{},type=st.type||'';thi
   const t=this.animT, m=this.mode;
   let bob=Math.sin(t*2.4)*1.4, sx=1, sy=1, rot=0, ox=0, oy=0;
   const moving=m==='free'&&Math.abs(this.vx)>14;
-  if(moving){bob=Math.sin(t*11)*2.2;sx=1+Math.sin(t*11)*.018;rot=Math.sin(t*11)*.025}
+  // Sprite presentation follows the same two-step cadence as the existing rig.
+  // The sprite is a full-body image, so we animate the whole pose with alternating
+  // heel/toe compression, bob, lean and a tiny stride offset instead of replacing
+  // the combat/physics rig.
+  if(moving){
+   const speed=clamp(Math.abs(this.vx)/WALK,0,1);
+   const ph=this.walkPh%(Math.PI*2);
+   const step=Math.sin(ph), step2=Math.sin(ph+Math.PI);
+   bob=Math.abs(step)*1.8*speed + Math.sin(ph*2)*.7*speed;
+   sx=1+Math.sin(ph*2)*.014*speed;
+   sy=1-Math.abs(step)*.012*speed;
+   rot=step*.028*speed;
+   ox=this.facing*step*2.5*speed;
+  }
   if(m==='attack'&&this.atk){
    const a=this.atk;
    const p=a.phase===0?clamp(a.t/a.W,0,1):a.phase===1?clamp(a.t/a.S,0,1):1-clamp(a.t/a.R,0,1);
@@ -185,7 +198,7 @@ startPower(G,pow){this.input.heavy=0;const st=pow.stats||{},type=st.type||'';thi
   if(m==='win'){bob=Math.sin(t*3)*3;sy=1.03}
   const H=190,W=104;
 
-  c.save();c.translate(ox,oy+bob);c.rotate(rot);c.scale(this.facing*sx,sy);
+  c.save();c.translate(ox,oy+bob);c.rotate(rot);c.scale(sx,sy);
   c.globalAlpha=this.flash>0?.72:1;
   c.globalCompositeOperation='source-over';
   c.drawImage(im,-W/2,-H,W,H);
