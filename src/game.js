@@ -21,7 +21,7 @@ const save=()=>{try{localStorage.setItem(KEY,JSON.stringify({player:state.player
 SFX.muted=state.muted;
 const ico=(n,c)=>'<svg class="i '+(c||'')+'" aria-hidden="true"><use href="#i-'+n+'"/></svg>';
 
-const screens=['splash','nameScreen','home','mp','room','leaderboard','settings','duel','result'];
+const screens=['splash','authScreen','nameScreen','home','mp','room','leaderboard','settings','duel','result'];
 let cur='splash';
 function show(id){cur=id;screens.forEach(s=>$(s).classList.toggle('active',s===id));document.body.classList.toggle('in-duel',id==='duel');
  if(id==='home')updateHome();if(id==='leaderboard')renderBoard();if(id==='settings')updateSettings();if(id!=='duel'){Match.active=false}window.scrollTo(0,0)}
@@ -290,11 +290,84 @@ $('nameOk').onclick=submitName;$('nameCancel').onclick=()=>show('home');$('nameP
 $('nameIn').onkeydown=e=>{if(e.key==='Enter')submitName()};$('nameIn').oninput=()=>{$('nameErr').textContent=''};
 $('diceBtn').onclick=()=>{$('nameIn').value=(pick(TAG1)+pick(TAG2)+(10+((Math.random()*90)|0))).slice(0,14);$('nameErr').textContent=''};
 
-/* ---- splash -> (gamertag) -> lobby ---- */
+/* ---- splash -> authentication -> gamertag -> lobby ---- */
+
 let splashDone=false;
-function leaveSplash(){if(splashDone)return;splashDone=true;clearTimeout(splashT);if(state.player.name)show('home');else openName(false)}
-const splashT=setTimeout(leaveSplash,3900);
-$('splash').addEventListener('pointerdown',()=>{SFX.init();SFX.resume();leaveSplash()});
+
+async function continueAfterAuth(){
+
+  try{
+
+    const session =
+      await DF.Supabase.auth.getSession();
+
+    if(
+      session &&
+      session.data &&
+      session.data.session
+    ){
+
+      if(state.player.name)
+        show('home');
+      else
+        openName(false);
+
+    }else{
+
+      show('authScreen');
+
+    }
+
+  }catch(e){
+
+    console.error('Authentication check failed:',e);
+
+    show('authScreen');
+
+  }
+
+}
+
+
+function leaveSplash(){
+
+  if(splashDone)return;
+
+  splashDone=true;
+
+  clearTimeout(splashT);
+
+  continueAfterAuth();
+
+}
+
+
+const splashT=setTimeout(
+  leaveSplash,
+  3900
+);
+
+
+$('splash').addEventListener(
+  'pointerdown',
+  ()=>{
+    SFX.init();
+    SFX.resume();
+    leaveSplash();
+  }
+);
+
+
+/* Called by auth.js after successful login/signup */
+
+window.DuelForgeAuthReady=function(){
+
+  if(state.player.name)
+    show('home');
+  else
+    openName(false);
+
+};
 
 /* ================= multiplayer: 4-digit room codes ================= */
 let remoteName='OPPONENT',roomT=0,roomBtns={};
