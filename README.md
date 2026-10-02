@@ -1,41 +1,41 @@
 # DuelForge
 
-Mobile-friendly 2D fantasy 1v1 fighting game. Vanilla HTML/CSS/JS — no build step, no npm, no backend, no external assets.
+Mobile-friendly 2D fantasy 1v1 fighting game. Vanilla HTML/CSS/JS — no build step, no npm, no backend of our own.
 
 ## Run
-Open `index.html` in a browser (or deploy the folder as-is to GitHub Pages: Settings → Pages → Deploy from branch → `main` → `/root`).
+Open `index.html` (or deploy the folder as-is to GitHub Pages). Multiplayer needs an internet connection; bots work offline.
+
+## Flow
+Splash ("developed by just two people, more updates coming soon") → gamertag screen (first launch; change it any time from the lobby pill or Settings) → lobby:
+- **Play with bots** – solo best-of-7.
+- **Multiplayer** – *Create room* shows a 4-digit code in the room lobby; the friend taps *Join room*, types the code, and the match starts automatically.
+- **Leaderboard** – local ranking (sample rivals + you). A real online board needs a server and is not faked.
+- **Settings** – sound, graphics (Auto / Low), gamertag.
 
 ## Controls
 | | Keyboard | Touch |
 |---|---|---|
-| Move | A / D (or arrows) | ◀ ▶ (hold, slide between them) |
+| Move | A / D (or arrows) | ◀ ▶ |
 | Jump | W / Space / ↑ | JUMP |
-| Attack | J (or K) | ATTACK |
-| Dash | L / Shift | DASH (hold a direction for dash direction) |
+| Attack | J | ATTACK |
+| Power attack | K (or U) | POWER |
+| Dash | L / Shift | DASH |
 
-## What's in it
-- **Best of 7**, first to 4 rounds. Every round both fighters get a new weapon (never the same as their last one, never the same as each other).
-- **7 weapons** with distinct wind-up / swing / recovery timing, damage, reach, knockback, walk speed, lunge and hit-stop: Sword, Dagger, Hammer, Spear, Axe, Katana, Greatblade.
-- **Procedural skeletal animation** (`src/fighter.js`): breathing idle, walk cycle, jump/fall, landing, dash, hurt, KO fall, victory, defeat kneel; cape/plume secondary motion.
-- **Real swings**: wind-up pose → fast arc → recovery. The weapon is attached to the animated hand; hits are tested against the weapon's *actual swept segment* during the swing. Trail, sparks, flare/ring, hit-stop, screen shake, knockback, hurt flash.
-- **Bot AI** (`src/bot.js`): spacing by weapon reach, punishes recovery, evades wind-ups with dash/jump/retreat, human-like reaction delays.
-- **Arena** (`src/arena.js`): moon, stars, castle ridge, parallax mountains, fog, torches (cyan/pink flames + light pools), embers, motes, sigil floor, vignette. Static layers are pre-rendered once.
-- **Coins / wins / leaderboard** kept from the MVP and now saved in `localStorage`. Win = +150 coins +1 win, loss = +50, +10 coins per round won. Tap the PLAYER pill to rename.
-- Tiny synthesized **SFX** (WebAudio, no files) with a mute toggle.
+## Combat
+- **Attack**: your weapon's normal swing. After every swing there is a cooldown (swing time + 0.28 s), so you can't spam or chain it. Shown as a bar (keyboard) / dimmed button (touch).
+- **Power attack**: ~0.5 s telegraphed charge (glowing aura — the opponent can dodge or interrupt you), then a heavy swing: ~1.6× damage (cap 36), 1.7× hitbox, 1.5× knockback. **7 s cooldown**, and it starts on cooldown for the first ~2 s of each round. Being hit while charging cancels it (and the cooldown is still spent).
+- Tuning lives in `src/fighter.js` (`HVCD`, `ATK_GAP`, `atkTimes()`).
 
-## Online (WebRTC, no server)
-`src/net.js` implements real peer-to-peer play over a WebRTC data channel using copy/paste **room codes** (~600 chars, deflate-compressed):
+## Multiplayer (4-digit codes)
+`src/net.js`: the room code is the host's id on the free public PeerJS broker (`wss://0.peerjs.com`), used **only** to swap the WebRTC handshake. Gameplay then runs peer-to-peer over a WebRTC data channel (host-authoritative, guest sends inputs and renders 30 Hz snapshots).
+Limits to know about: the public broker and Google STUN servers are free third-party services with no uptime guarantee, and some mobile-carrier/strict NATs can't connect peer-to-peer without a TURN server. Both can be replaced via the `SIGNAL` and `ICE` constants at the top of `net.js` (e.g. your own PeerJS server + a TURN service).
 
-1. Host: *Play a friend → Create room → Generate room code* and send it to the friend.
-2. Guest: *Join room*, paste it, *Generate reply*, send the reply code back.
-3. Host pastes the reply → *Connect*. The duel starts automatically.
-
-Host-authoritative model: the host runs the simulation, the guest sends inputs and renders 30 Hz snapshots + hit events (so the guest feels one round-trip of input latency). Free public STUN servers are used; strict/symmetric NATs may need a TURN server, which cannot be free/serverless.
-
-**Automatic matchmaking** needs a signaling rendezvous (a server). The transport is already isolated: `DF.Net.createRoom/joinRoom/acceptAnswer` only exchange two opaque strings, so any relay (even a tiny serverless function) can replace the manual copy/paste without touching gameplay code. Not faked: with no relay, there is no matchmaking.
-
-## Performance notes
-`requestAnimationFrame` + clamped delta time, fixed ≤20 ms sim sub-steps, pre-rendered background layers, ≤140 pooled particles, no shadowBlur, no libraries. Backing canvas is capped at 1280 px wide and drops resolution automatically (up to two steps) if frames run slow.
+## Low-end device optimizations
+- Canvas resolution capped (960 px wide on weak devices, 1280 otherwise) and auto-lowered if the frame rate drops; **Settings → Graphics → Low** forces ~56 % resolution, a 30 fps cap, fewer particles (60), no fog/vignette/motes.
+- Weak devices (≤4 cores / ≤2 GB RAM) start one quality step lower automatically.
+- Render loop fully stops outside a match (no idle rAF work). Static background layers pre-rendered once.
+- UI uses system fonts, inline SVG icons (no images), no `backdrop-filter`/blur; `body.lowfx` strips shadows and decorative animation; reduced-motion respected.
+- Network messages are small JSON at 30 Hz; HUD DOM writes are cached and only happen on change.
 
 ## Files
-`index.html` · `src/style.css` · `src/weapons.js` (data + weapon art) · `src/fighter.js` (rig, animation, combat state) · `src/arena.js` · `src/fx.js` (particles/shake/SFX) · `src/bot.js` · `src/net.js` · `src/game.js` (match flow, input, render loop, UI, online glue)
+`index.html` · `logo.svg` · `src/style.css` · `src/weapons.js` · `src/fighter.js` (rig, animation, combat, cooldowns) · `src/arena.js` · `src/fx.js` · `src/bot.js` · `src/net.js` (rooms) · `src/game.js` (flow, input, render loop, UI, online glue)
