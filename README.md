@@ -43,3 +43,21 @@ Limits to know about: the public broker and Google STUN servers are free third-p
 
 ## Files
 `index.html` · `logo.svg` · `src/style.css` · `src/weapons.js` (weapon data + art) · `src/fighter.js` (rig, animation, combat, cooldowns) · `src/arena.js` · `src/fx.js` · `src/bot.js` · `src/net.js` (rooms) · `src/game.js` (flow, input, render loop, UI, online glue)
+
+## DuelForge upgrade notes
+
+This revision preserves the existing canvas/WebRTC architecture and adds Supabase-backed progression.
+
+### Supabase setup
+
+Run `SUPABASE_DUELFORGE.sql` once in the Supabase SQL Editor. It creates the profile/catalog/inventory/reward tables, RLS policies, account trigger, purchase/upgrade/equip/reward RPCs, and the shared leaderboard RPC. Existing auth users are backfilled into `duelforge_profiles`.
+
+The browser continues to use only the existing publishable Supabase key. No service-role key is used in frontend code.
+
+### Multiplayer
+
+Room setup now waits for a connection handshake (`hello` → `room_ready` → `start`) instead of starting from a fixed timer. Failed/disconnected pre-open peer connections are cleared so a host can accept a fresh join without changing ownership.
+
+### GitHub Pages
+
+No build step or server runtime was introduced. Keep the project as a static site and publish the repository root with GitHub Pages.
