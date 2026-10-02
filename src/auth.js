@@ -1,239 +1,180 @@
-(function () {
+/* =========================================================
+   DUELFORGE AUTHENTICATION
+   ========================================================= */
 
-  const sb = DF.Supabase;
+window.DFAuth = {
 
-  let signupMode = false;
+  mode: 'signin',
 
-  const $ = id => document.getElementById(id);
-
-
-  function showMessage(text, error = false) {
-
-    const el = $('authMessage');
+  setMessage: function (text, type = '') {
+    const el = document.getElementById('authMessage');
 
     if (!el) return;
 
     el.textContent = text;
+    el.className = 'message';
 
-    el.className = error
-      ? 'message auth-error'
-      : 'message auth-success';
-  }
-
-
-  function showAuth() {
-
-    show('authScreen');
-
-    $('authPassword').value = '';
-
-  }
+    if (type) {
+      el.classList.add('auth-' + type);
+    }
+  },
 
 
-  async function showAuthenticated() {
+  setMode: function (mode) {
 
-    const {
-      data: {
-        session
-      }
-    } = await sb.auth.getSession();
+    this.mode = mode;
 
-    if (session) {
+    const title = document.getElementById('authTitle');
+    const subtitle = document.getElementById('authSubtitle');
+    const submit = document.getElementById('authSubmit');
+    const toggle = document.getElementById('authToggle');
+    const password = document.getElementById('authPassword');
 
-      /*
-       * The player is already logged in.
-       *
-       * Your existing game will now continue
-       * to the gamertag screen.
-       */
+    if (!title || !subtitle || !submit || !toggle) return;
 
-      if (window.DuelForgeAuthReady) {
-        window.DuelForgeAuthReady();
-      }
+    this.setMessage('');
+
+    if (mode === 'signup') {
+
+      title.textContent = 'Create account';
+
+      subtitle.textContent =
+        'Create your DuelForge account.';
+
+      submit.textContent =
+        'CREATE ACCOUNT';
+
+      toggle.textContent =
+        'I ALREADY HAVE AN ACCOUNT';
+
+      password.autocomplete = 'new-password';
 
     } else {
 
-      showAuth();
+      title.textContent = 'Welcome back';
 
+      subtitle.textContent =
+        'Sign in to enter the arena.';
+
+      submit.textContent =
+        'SIGN IN';
+
+      toggle.textContent =
+        'CREATE ACCOUNT';
+
+      password.autocomplete = 'current-password';
     }
-  }
+  },
 
 
-  /* ---------------------------------------------------------
-     SIGN IN / SIGN UP BUTTON
-     --------------------------------------------------------- */
-
-  $('authSubmit').addEventListener('click', async function () {
+  submit: async function () {
 
     const email =
-      $('authEmail').value.trim();
+      document.getElementById('authEmail').value.trim();
 
     const password =
-      $('authPassword').value;
+      document.getElementById('authPassword').value;
 
+    const button =
+      document.getElementById('authSubmit');
 
     if (!email) {
 
-      showMessage(
-        'Enter your email address.',
-        true
+      this.setMessage(
+        'Please enter your email.',
+        'error'
       );
 
       return;
-
     }
 
+    if (!password || password.length < 6) {
 
-    if (!password) {
-
-      showMessage(
-        'Enter your password.',
-        true
-      );
-
-      return;
-
-    }
-
-
-    if (password.length < 6) {
-
-      showMessage(
+      this.setMessage(
         'Password must be at least 6 characters.',
-        true
+        'error'
       );
 
       return;
-
     }
-
-
-    const button = $('authSubmit');
 
     button.disabled = true;
 
+    this.setMessage(
+      this.mode === 'signup'
+        ? 'Creating account...'
+        : 'Signing in...'
+    );
 
     try {
 
-      /* =====================================================
-         SIGN UP
-         ===================================================== */
+      let result;
 
-      if (signupMode) {
+      if (this.mode === 'signup') {
 
-        const {
-          data,
-          error
-        } = await sb.auth.signUp({
+        result =
+          await DF.Supabase.auth.signUp({
+            email: email,
+            password: password
+          });
 
-          email: email,
+      } else {
 
-          password: password,
-
-          options: {
-
-            emailRedirectTo:
-              window.location.origin +
-              window.location.pathname
-
-          }
-
-        });
-
-
-        if (error) {
-          throw error;
-        }
-
-
-        /*
-         * If email confirmation is enabled,
-         * Supabase normally returns no session here.
-         */
-
-        if (!data.session) {
-
-          showMessage(
-            'Account created! Check your email and confirm your account.'
-          );
-
-        } else {
-
-          showMessage(
-            'Account created successfully!'
-          );
-
-          setTimeout(() => {
-
-            if (window.DuelForgeAuthReady) {
-              window.DuelForgeAuthReady();
-            }
-
-          }, 500);
-
-        }
-
-
+        result =
+          await DF.Supabase.auth.signInWithPassword({
+            email: email,
+            password: password
+          });
       }
 
-      /* =====================================================
-         LOGIN
-         ===================================================== */
 
-      else {
-
-        const {
-          data,
-          error
-        } = await sb.auth.signInWithPassword({
-
-          email: email,
-
-          password: password
-
-        });
+      if (result.error) {
+        throw result.error;
+      }
 
 
-        if (error) {
-          throw error;
-        }
+      if (this.mode === 'signup') {
 
+        if (result.data.session) {
 
-        if (!data.session) {
-
-          throw new Error(
-            'Login succeeded, but no session was returned.'
+          this.setMessage(
+            'Account created!',
+            'success'
           );
-
-        }
-
-
-        showMessage(
-          'Signed in successfully!'
-        );
-
-
-        setTimeout(() => {
 
           if (window.DuelForgeAuthReady) {
             window.DuelForgeAuthReady();
           }
 
-        }, 300);
+        } else {
+
+          this.setMessage(
+            'Account created. Check your email to confirm your account.',
+            'success'
+          );
+
+        }
+
+      } else {
+
+        this.setMessage(
+          'Signed in!',
+          'success'
+        );
+
+        if (window.DuelForgeAuthReady) {
+          window.DuelForgeAuthReady();
+        }
 
       }
 
-
     } catch (error) {
 
-      console.error(
-        'Supabase authentication error:',
-        error
-      );
+      console.error('DuelForge auth error:', error);
 
-      showMessage(
+      this.setMessage(
         error.message || 'Authentication failed.',
-        true
+        'error'
       );
 
     } finally {
@@ -241,197 +182,157 @@
       button.disabled = false;
 
     }
-
-  });
-
-
-  /* ---------------------------------------------------------
-     LOGIN <-> SIGN UP
-     --------------------------------------------------------- */
-
-  $('authToggle').addEventListener('click', function () {
-
-    signupMode = !signupMode;
+  },
 
 
-    if (signupMode) {
+  getUser: async function () {
 
-      $('authTitle').textContent =
-        'Create your account';
+    const {
+      data,
+      error
+    } = await DF.Supabase.auth.getUser();
 
-      $('authSubtitle').textContent =
-        'Create an account to enter the arena.';
-
-      $('authSubmit').textContent =
-        'CREATE ACCOUNT';
-
-      $('authToggle').textContent =
-        'I ALREADY HAVE AN ACCOUNT';
-
-      $('authPassword').autocomplete =
-        'new-password';
-
-    } else {
-
-      $('authTitle').textContent =
-        'Welcome back';
-
-      $('authSubtitle').textContent =
-        'Sign in to enter the arena.';
-
-      $('authSubmit').textContent =
-        'SIGN IN';
-
-      $('authToggle').textContent =
-        'CREATE ACCOUNT';
-
-      $('authPassword').autocomplete =
-        'current-password';
-
+    if (error) {
+      console.error(error);
+      return null;
     }
 
-
-    showMessage('');
-
-  });
+    return data.user;
+  },
 
 
-  /* ---------------------------------------------------------
-     AUTH STATE CHANGES
-     --------------------------------------------------------- */
+  getSession: async function () {
 
-  sb.auth.onAuthStateChange(
-    function (event, session) {
+    const {
+      data,
+      error
+    } = await DF.Supabase.auth.getSession();
 
-      console.log(
-        'Supabase auth event:',
-        event
+    if (error) {
+      console.error(error);
+      return null;
+    }
+
+    return data.session;
+  },
+
+
+  logout: async function () {
+
+    const {
+      error
+    } = await DF.Supabase.auth.signOut();
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    location.reload();
+  },
+
+
+  init: function () {
+
+    const submit =
+      document.getElementById('authSubmit');
+
+    const toggle =
+      document.getElementById('authToggle');
+
+    if (submit) {
+
+      submit.addEventListener(
+        'click',
+        () => this.submit()
       );
 
-
-      if (event === 'SIGNED_OUT') {
-
-        showAuth();
-
-      }
-
-    }
-  );
-
-
-  /* ---------------------------------------------------------
-     PUBLIC AUTH API
-     --------------------------------------------------------- */
-
-  window.DFAuth = {
-
-    getUser: async function () {
-
-      const {
-        data,
-        error
-      } = await sb.auth.getUser();
-
-
-      if (error) {
-
-        console.error(error);
-
-        return null;
-
-      }
-
-
-      return data.user;
-
-    },
-
-
-    getSession: async function () {
-
-      const {
-        data,
-        error
-      } = await sb.auth.getSession();
-
-
-      if (error) {
-
-        console.error(error);
-
-        return null;
-
-      }
-
-
-      return data.session;
-
-    },
-
-
-    logout: async function () {
-
-      const {
-        error
-      } = await sb.auth.signOut();
-
-
-      if (error) {
-
-        console.error(
-          'Logout error:',
-          error
-        );
-
-        throw error;
-
-      }
-
     }
 
-  };
 
+    if (toggle) {
 
-  /*
-   * This is called by game.js when the splash screen
-   * has finished and authentication is ready.
-   */
+      toggle.addEventListener(
+        'click',
+        () => {
 
-  window.DuelForgeAuthReady = function () {
+          this.setMode(
+            this.mode === 'signin'
+              ? 'signup'
+              : 'signin'
+          );
 
-    if (window.DuelForgeAuthenticated) {
-
-      return;
+        }
+      );
 
     }
 
 
-    window.DuelForgeAuthenticated = true;
+    const email =
+      document.getElementById('authEmail');
+
+    const password =
+      document.getElementById('authPassword');
+
+    if (email) {
+
+      email.addEventListener(
+        'keydown',
+        e => {
+
+          if (e.key === 'Enter') {
+            this.submit();
+          }
+
+        }
+      );
+
+    }
 
 
-    /*
-     * Continue into the game's existing
-     * gamertag flow.
-     */
+    if (password) {
 
-    if (state.player.name) {
+      password.addEventListener(
+        'keydown',
+        e => {
 
-      show('home');
+          if (e.key === 'Enter') {
+            this.submit();
+          }
+
+        }
+      );
+
+    }
+
+    this.setMode('signin');
+
+  }
+
+};
+
+
+/* Wait until the page has loaded before
+   connecting the auth buttons. */
+
+window.addEventListener(
+  'DOMContentLoaded',
+  () => {
+
+    if (
+      window.DF &&
+      DF.Supabase
+    ) {
+
+      DFAuth.init();
 
     } else {
 
-      openName(false);
+      console.error(
+        'DuelForge: Supabase is not available.'
+      );
 
     }
 
-  };
-
-
-  /*
-   * Initial authentication check.
-   */
-
-  showAuthenticated();
-
-
-})();
+  }
+);
