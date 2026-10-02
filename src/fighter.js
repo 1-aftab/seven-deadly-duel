@@ -3,7 +3,7 @@
 const DF=window.DF=window.DF||{};
 const H=Math.PI/2;
 const THIGH=30,SHIN=30,TORSO=42,UARM=23,FARM=22,HEADR=13;
-const GROUND=412,WALK=215,JUMP=640,GRAV=1850,DASHV=640;
+const GROUND=412,WALK=215,JUMP=640,GRAV=1850,DASHV=640,HVCD=7,ATK_GAP=.28;
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 const MODES=['intro','free','attack','hurt','dash','win','lose','ko'];
 const KEYS=['lean','head','f1','f2','b1','b2','w','fT','fK','bT','bK'];
@@ -24,18 +24,18 @@ function ik(sx,sy,tx,ty,a,b,out){let dx=tx-sx,dy=ty-sy,d=Math.hypot(dx,dy);const
 
 class Fighter{
  constructor(side,name){this.side=side;this.name=name;this.pal=PAL[side];this.pose=mk();this.tgt=mk();this.rig={};this.ik={};
-  this.input={left:false,right:false,jump:0,attack:0,dash:0};this.trail=[];this.ghosts=[];this.cape={x:-26,y:46};this.weapon=DF.WEAPONS.sword;this.reset(300,1,this.weapon)}
+  this.input={left:false,right:false,jump:0,attack:0,dash:0,heavy:0};this.atkCd=0;this.hvCd=0;this.trail=[];this.ghosts=[];this.cape={x:-26,y:46};this.weapon=DF.WEAPONS.sword;this.reset(300,1,this.weapon)}
  reset(x,face,weapon){this.x=x;this.y=GROUND;this.vx=0;this.vy=0;this.facing=face;this.grounded=true;this.hp=100;this.mode='intro';this.modeT=0;this.atk=null;this.prevSeg=null;
-  this.dashCd=0;this.inv=0;this.flash=0;this.landT=0;this.walkPh=0;this.animT=Math.random()*5;this.rot=0;this.yOff=0;this.shakeT=0;this.hipY=-56;this.hurtDur=.3;this.dashDir=1;this.ghostT=0;
-  this.trail.length=0;this.ghosts.length=0;this.weapon=weapon;this.input.left=this.input.right=false;this.input.jump=this.input.attack=this.input.dash=0;
+  this.dashCd=0;this.atkCd=0;this.hvCd=3.5;this.inv=0;this.flash=0;this.landT=0;this.walkPh=0;this.animT=Math.random()*5;this.rot=0;this.yOff=0;this.shakeT=0;this.hipY=-56;this.hurtDur=.3;this.dashDir=1;this.ghostT=0;
+  this.trail.length=0;this.ghosts.length=0;this.weapon=weapon;this.input.left=this.input.right=false;this.input.jump=this.input.attack=this.input.dash=this.input.heavy=0;
   Object.assign(this.pose,DF.READY);this.rig={};this.computeRig(1)}
  setMode(m){this.mode=m;this.modeT=0}
  get alive(){return this.hp>0}
  /* ---------- gameplay logic (authoritative side only) ---------- */
  logic(dt,opp,G){
   const I=this.input,w=this.weapon;this.modeT+=dt;
-  this.dashCd=Math.max(0,this.dashCd-dt);this.inv=Math.max(0,this.inv-dt);this.flash-=dt;this.landT-=dt;this.shakeT-=dt;
-  I.jump=Math.max(0,I.jump-dt);I.attack=Math.max(0,I.attack-dt);I.dash=Math.max(0,I.dash-dt);
+  this.dashCd=Math.max(0,this.dashCd-dt);this.atkCd=Math.max(0,this.atkCd-dt);this.hvCd=Math.max(0,this.hvCd-dt);this.inv=Math.max(0,this.inv-dt);this.flash-=dt;this.landT-=dt;this.shakeT-=dt;
+  I.jump=Math.max(0,I.jump-dt);I.attack=Math.max(0,I.attack-dt);I.dash=Math.max(0,I.dash-dt);I.heavy=Math.max(0,I.heavy-dt);
   const dir=(I.right?1:0)-(I.left?1:0),spd=WALK*w.speed;
   const faceOpp=()=>{const dx=opp.x-this.x;if(Math.abs(dx)>6)this.facing=dx>0?1:-1};
   const m=this.mode;
@@ -44,16 +44,16 @@ class Fighter{
    const tv=dir*spd,k=this.grounded?16:5;this.vx+=(tv-this.vx)*Math.min(1,k*dt);
    if(I.jump>0&&this.grounded){this.vy=-JUMP;this.grounded=false;I.jump=0;G.onJump(this)}
    if(I.dash>0&&this.dashCd<=0)this.startDash(dir||this.facing,G);
-   else if(I.attack>0)this.startAttack(G);
+   else if(I.heavy>0&&this.hvCd<=0)this.startAttack(G,true);
+   else if(I.attack>0&&this.atkCd<=0)this.startAttack(G,false);
   }else if(m==='attack'){
    const a=this.atk;a.t+=dt;
-   if(a.phase===0){this.vx+=(dir*spd*.3-this.vx)*Math.min(1,10*dt);if(a.t>=w.wind){a.t-=w.wind;a.phase=1;this.prevSeg=null;this.vx+=this.facing*w.lunge;G.onSwing(this)}}
-   if(a.phase===1){this.vx*=Math.exp(-dt*6);if(a.t>=w.swing){a.t-=w.swing;a.phase=2;G.onSwingEnd(this)}}
+   if(a.phase===0){this.vx+=(dir*spd*.3-this.vx)*Math.min(1,10*dt);if(a.t>=a.W){a.t-=a.W;a.phase=1;this.prevSeg=null;this.vx+=this.facing*w.lunge*(a.heavy?1.4:1);G.onSwing(this)}}
+   if(a.phase===1){this.vx*=Math.exp(-dt*6);if(a.t>=a.S){a.t-=a.S;a.phase=2;G.onSwingEnd(this)}}
    if(a.phase===2){this.vx*=Math.exp(-dt*9);
-    if(a.t>=w.rec*.55){if(I.dash>0&&this.dashCd<=0){this.atk=null;this.startDash(dir||-this.facing,G)}
-     else if(I.attack>0){this.startAttack(G)}
+    if(a.t>=a.R*.55){if(I.dash>0&&this.dashCd<=0){this.atk=null;this.startDash(dir||-this.facing,G)}
      else if(I.jump>0&&this.grounded){this.atk=null;this.setMode('free')}}
-    if(this.atk&&a.t>=w.rec){this.atk=null;this.setMode('free')}}
+    if(this.atk&&a.t>=a.R){this.atk=null;this.setMode('free')}}
   }else if(m==='dash'){
    this.vx=this.dashDir*DASHV*Math.max(0,1-this.modeT/.2)+this.dashDir*80;this.ghostT-=dt;if(this.ghostT<=0){this.ghostT=.03;this.ghosts.push({x:this.x,y:this.y,f:this.facing,a:.5});if(this.ghosts.length>5)this.ghosts.shift()}
    if(this.modeT>=.19){this.setMode('free')}
@@ -67,7 +67,12 @@ class Fighter{
   if(this.y>=GROUND){if(!this.grounded){this.y=GROUND;if(this.vy>260){this.landT=.14;G.onLand(this)}this.vy=0;this.grounded=true}else{this.y=GROUND;this.vy=0}}
   if(this.x<56){this.x=56;this.vx=Math.max(0,this.vx)}else if(this.x>904){this.x=904;this.vx=Math.min(0,this.vx)}
  }
- startAttack(G){this.input.attack=0;const f={};for(const k of KEYS)f[k]=this.pose[k];this.atk={phase:0,t:0,hit:false,from:f};this.setMode('attack');this.prevSeg=null;G.onAttackStart&&G.onAttackStart(this)}
+ atkTimes(hv){const w=this.weapon;return hv?{W:w.wind+.5,S:w.swing*1.15,R:w.rec*1.3,dmg:Math.min(36,Math.round(w.dmg*1.6+6))}:{W:w.wind,S:w.swing,R:w.rec,dmg:w.dmg}}
+ atkCdMax(){const w=this.weapon;return w.wind+w.swing+w.rec+ATK_GAP}
+ startAttack(G,hv){this.input.attack=0;this.input.heavy=0;const f={};for(const k of KEYS)f[k]=this.pose[k];const T=this.atkTimes(hv);
+  this.atk={phase:0,t:0,hit:false,from:f,heavy:!!hv,W:T.W,S:T.S,R:T.R,dmg:T.dmg};
+  if(hv){this.hvCd=HVCD;this.atkCd=Math.max(this.atkCd,T.W+T.S+T.R+.2)}else this.atkCd=T.W+T.S+T.R+ATK_GAP;
+  this.setMode('attack');this.prevSeg=null;G.onAttackStart&&G.onAttackStart(this)}
  startDash(d,G){this.input.dash=0;this.atk=null;this.dashDir=d;this.dashCd=.85;this.inv=.12;this.setMode('dash');this.ghostT=0;G.onDash(this)}
  hurt(dir,kb,up,dur){this.atk=null;this.setMode('hurt');this.hurtDur=dur;this.vx=dir*kb;if(up>0){this.vy=-up;this.grounded=false}this.flash=.1;this.shakeT=.12;this.inv=dur+.1}
  die(dir,kb){this.atk=null;this.setMode('ko');this.vx=dir*kb*1.1;this.vy=-300;this.grounded=false;this.flash=.14;this.shakeT=.2;this.inv=9}
@@ -87,9 +92,9 @@ class Fighter{
   else if(m==='free'){if(!this.grounded)this.airPose(T,this.vy);else if(this.landT>0){T.fT=H-.7;T.fK=1.2;T.bT=H+.6;T.bK=1.0;T.lean=.3}
     else if(Math.abs(this.vx)>14)walk()}
   else if(m==='attack'){const a=this.atk;direct=true;rLeg=20;rBody=45;let u;const from=a.from,wp=w.wp,ep=w.ep;
-   if(a.phase===0){u=easeOut(clamp(a.t/w.wind,0,1));for(const k of KEYS)T[k]=from[k]+(wp[k]-from[k])*u;for(const k of LEGS)T[k]=wp[k]}
-   else if(a.phase===1){const s=clamp(a.t/w.swing,0,1);u=Math.pow(s,1.55);for(const k of KEYS)T[k]=wp[k]+(ep[k]-wp[k])*u;for(const k of LEGS)T[k]=ep[k]}
-   else{const r=clamp(a.t/w.rec,0,1);u=smooth(clamp((r-.18)/.82,0,1));const st=DF.READY;for(const k of KEYS)T[k]=ep[k]+(st[k]-ep[k])*u;for(const k of LEGS)T[k]=ep[k]+(st[k]-ep[k])*clamp(u*1.2,0,1)}
+   if(a.phase===0){u=easeOut(clamp(a.t/a.W,0,1));for(const k of KEYS)T[k]=from[k]+(wp[k]-from[k])*u;for(const k of LEGS)T[k]=wp[k];if(a.heavy)T.lean+=Math.sin(this.animT*60)*.025}
+   else if(a.phase===1){const s=clamp(a.t/a.S,0,1);u=Math.pow(s,1.55);for(const k of KEYS)T[k]=wp[k]+(ep[k]-wp[k])*u;for(const k of LEGS)T[k]=ep[k]}
+   else{const r=clamp(a.t/a.R,0,1);u=smooth(clamp((r-.18)/.82,0,1));const st=DF.READY;for(const k of KEYS)T[k]=ep[k]+(st[k]-ep[k])*u;for(const k of LEGS)T[k]=ep[k]+(st[k]-ep[k])*clamp(u*1.2,0,1)}
    if(!this.grounded){const A={};this.airPose(A,this.vy);for(const k of LEGS)T[k]=A[k]}}
   else if(m==='dash'){const d=this.dashDir*this.facing;T.lean=d>0?.55:-.3;T.fT=H-1.0*d;T.fK=.25;T.bT=H+1.0*d;T.bK=.2;T.f1=d>0?.1:.9;T.f2=d>0?-.1:-1.1;T.w=d>0?-.15:-1.0;T.b1=d>0?1.9:-.4;T.b2=-.3;rArm=30;rBody=30;rLeg=30}
   else if(m==='hurt'){const k=clamp(1-this.modeT/this.hurtDur,0,1),sh=Math.sin(this.modeT*60)*.03*k;
@@ -129,15 +134,15 @@ class Fighter{
   for(let i=this.trail.length-1;i>=0;i--){this.trail[i].age+=dt;if(this.trail[i].age>.17)this.trail.splice(i,1)}
   if(act){const R=this.rig,f=this.facing,s=this.seg({age:0});s.gx=this.x+f*R.gx;s.gy=this.y+R.gy;s.a=Math.atan2(Math.sin(this.pose.w),f*Math.cos(this.pose.w));this.trail.push(s);if(this.trail.length>14)this.trail.shift()}}
  /* ---------- network snapshot (host -> guest) ---------- */
- serialize(){const r=v=>Math.round(v*10)/10,a=this.atk;return[r(this.x),r(this.y),r(this.vx),r(this.vy),this.facing,r(this.hp),MODES.indexOf(this.mode),Math.round(this.modeT*100)/100,a?a.phase:-1,a?Math.round(a.t*1000)/1000:0,this.grounded?1:0,this.flash>0?1:0,this.hurtDur]}
- applySnap(s,G){this.sn=s;const mode=MODES[s[6]];this.hp=s[5];this.facing=s[4];this.grounded=!!s[10];this.hurtDur=s[12]||.3;this.snAge=0;
+ serialize(){const r=v=>Math.round(v*10)/10,a=this.atk;return[r(this.x),r(this.y),r(this.vx),r(this.vy),this.facing,r(this.hp),MODES.indexOf(this.mode),Math.round(this.modeT*100)/100,a?a.phase:-1,a?Math.round(a.t*1000)/1000:0,this.grounded?1:0,this.flash>0?1:0,this.hurtDur,a&&a.heavy?1:0,r(this.atkCd),r(this.hvCd)]}
+ applySnap(s,G){this.sn=s;const mode=MODES[s[6]];this.hp=s[5];this.facing=s[4];this.grounded=!!s[10];this.hurtDur=s[12]||.3;this.snAge=0;this.atkCd=s[14]||0;this.hvCd=s[15]||0;
   if(mode!==this.mode){this.mode=mode}this.modeT=s[7];if(s[11])this.flash=.08;
-  if(s[8]>=0){if(!this.atk){const f={};for(const k of KEYS)f[k]=this.pose[k];this.atk={phase:s[8],t:s[9],hit:false,from:f}}
+  if(s[8]>=0){if(!this.atk){const f={};for(const k of KEYS)f[k]=this.pose[k];const T=this.atkTimes(!!s[13]);this.atk={phase:s[8],t:s[9],hit:false,from:f,heavy:!!s[13],W:T.W,S:T.S,R:T.R,dmg:T.dmg};if(s[13]&&s[8]===0)G.onAttackStart&&G.onAttackStart(this)}
    else{if(this.atk.phase!==s[8]&&s[8]===1){G.onSwing(this);this.prevSeg=null}this.atk.phase=s[8];this.atk.t=s[9]}}else this.atk=null;
   if(Math.abs(this.x-s[0])>90){this.x=s[0];this.y=s[1]}}
  guestTick(dt){const s=this.sn;if(s){this.snAge+=dt;const a=Math.min(this.snAge,.1),k=1-Math.exp(-dt*20);this.x+=(s[0]+s[2]*a-this.x)*k;this.y+=(s[1]+s[3]*a-this.y)*k;this.vx=s[2];this.vy=s[3]}
-  this.modeT+=dt;this.flash-=dt;this.landT-=dt;this.dashCd=0;const w=this.weapon;
-  if(this.atk){this.atk.t+=dt;const lim=[w.wind,w.swing,w.rec][this.atk.phase];if(this.atk.t>lim)this.atk.t=lim}
+  this.modeT+=dt;this.flash-=dt;this.landT-=dt;this.dashCd=0;this.atkCd=Math.max(0,this.atkCd-dt);this.hvCd=Math.max(0,this.hvCd-dt);
+  if(this.atk){this.atk.t+=dt;const lim=[this.atk.W,this.atk.S,this.atk.R][this.atk.phase];if(this.atk.t>lim)this.atk.t=lim}
   if(this.mode==='dash'){this.ghostT-=dt;if(this.ghostT<=0){this.ghostT=.03;this.ghosts.push({x:this.x,y:this.y,f:this.facing,a:.5});if(this.ghosts.length>5)this.ghosts.shift()}}}
  /* ---------- drawing ---------- */
  drawShadow(c){const h=clamp((GROUND-this.y)/160,0,1),rx=34*(1-h*.4),a=.5*(1-h*.6);if(this.mode==='ko'&&this.modeT>.2){}
@@ -157,6 +162,10 @@ class Fighter{
   c.save();c.translate(this.x+jx,this.y+this.yOff);c.scale(this.facing,1);
   if(this.rot){c.rotate(this.rot);c.translate(0,-7*Math.min(1,-this.rot))}
   c.lineCap='round';c.lineJoin='round';
+  const chg=this.atk&&this.atk.heavy&&this.atk.phase===0;
+  if(chg){const k=clamp(this.atk.t/this.atk.W,0,1);c.globalCompositeOperation='lighter';c.strokeStyle=this.pal.accent;c.fillStyle=this.pal.accent;
+   c.globalAlpha=.12+.25*k;c.beginPath();c.arc(0,-62,34+14*k,0,6.283);c.fill();c.globalAlpha=.85*(1-k*.4);c.lineWidth=3;c.beginPath();c.arc(0,-62,82-48*k,0,6.283);c.stroke();
+   c.globalAlpha=1;c.globalCompositeOperation='source-over'}
   // cape
   const cp=this.cape,ax=R.sx-3,ay=R.sy-4,bx=R.hx-6,by=R.hy-4;
   c.fillStyle=pal.cape;c.beginPath();c.moveTo(ax,ay);c.quadraticCurveTo(ax+cp.x*.35,ay+cp.y*.2,ax+cp.x,ay+cp.y);c.quadraticCurveTo(bx+cp.x*.6+8,by+cp.y*.6,bx,by+4);c.closePath();c.fill();
@@ -183,7 +192,7 @@ class Fighter{
   c.restore();
   drawLeg(R.kfx,R.kfy,R.ffx,R.ffy,pal.armor,pal.armor2);
   // weapon (grip -> blade), glow while swinging
-  const swinging=this.atk&&this.atk.phase===1;
+  const swinging=this.atk&&(this.atk.phase===1||this.atk.heavy&&this.atk.phase===0);
   c.save();c.translate(R.gx,R.gy);c.rotate(P.w);DF.drawWeapon(c,w.id,pal.accent,swinging?1:0);c.restore();
   limb(R.sx,R.sy,R.efx,R.efy,9,pal.armor);limb(R.efx,R.efy,R.hfx,R.hfy,8,pal.armor2);c.fillStyle=pal.metal;c.beginPath();c.arc(R.hfx,R.hfy,4.8,0,6.283);c.fill();
   if(w.two){limb(R.sx,R.sy,R.ebx,R.eby,8,pal.dark);limb(R.ebx,R.eby,R.hbx,R.hby,7,pal.dark);c.fillStyle=pal.metal;c.beginPath();c.arc(R.hbx,R.hby,4.4,0,6.283);c.fill()}
@@ -191,5 +200,5 @@ class Fighter{
   c.restore();
  }
 }
-DF.Fighter=Fighter;DF.GROUND=GROUND;DF.MODES=MODES;
+DF.Fighter=Fighter;DF.HVCD=HVCD;DF.GROUND=GROUND;DF.MODES=MODES;
 })();

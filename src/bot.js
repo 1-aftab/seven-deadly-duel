@@ -18,7 +18,7 @@ class Bot{
    if(threat&&Math.random()<.35+L*.06){
      const r=Math.random();
      this.intent='retreat';this.hold=.35;if(r<.4&&me.dashCd<=0){I.dash=.12;set(-to)}else if(r<.7&&me.grounded){I.jump=.12}
-   }else if(oppRecover&&dist<range+10&&Math.random()<.8){this.intent='attack'}
+   }else if(oppRecover&&dist<range+10&&Math.random()<.8){this.intent='attack';if(me.hvCd<=0&&me.mode==='free'&&Math.random()<.45){I.heavy=.14}}
    else if(dist>range+140&&Math.random()<.25&&me.dashCd<=0){I.dash=.12;set(to)}
    else if(dist>range){this.intent='approach';if(Math.random()<.08&&me.grounded){I.jump=.12}}
    else if(dist<range*.45&&Math.random()<.4){this.intent='retreat';this.hold=.25}
@@ -26,7 +26,7 @@ class Bot{
   }
   if(this.intent==='approach')set(dist>range*.92?to:0);
   else if(this.intent==='retreat'){if(this.hold>0)set(-to);else this.intent='wait'}
-  else if(this.intent==='attack'){set(dist>range?to:0);if(dist<=range+8&&me.mode==='free'&&I.attack<=0){I.attack=.14;this.intent='wait';this.hold=.15+Math.random()*.3}}
+  else if(this.intent==='attack'){set(dist>range?to:0);if(dist<=range+8&&me.mode==='free'&&I.attack<=0&&I.heavy<=0){if(me.hvCd<=0&&Math.random()<.18)I.heavy=.14;else if(me.atkCd<=0)I.attack=.14;else{this.intent='wait';this.hold=.12}if(I.attack>0||I.heavy>0){this.intent='wait';this.hold=.15+Math.random()*.3}}}
   else if(this.intent==='wait'){set(0);if(this.hold<=0)this.intent='approach'}
  }
 }

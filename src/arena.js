@@ -11,7 +11,7 @@ const TORCHES=[{x:96,c:'c'},{x:336,c:'c'},{x:624,c:'p'},{x:864,c:'p'}];
 const COL={c:'#4fe3ff',p:'#ff4f9a'};
 function ridge(seed,base,amp,x0,x1){const r=rng(seed),pts=[];let ph=r()*9,ph2=r()*9;for(let x=x0;x<=x1;x+=30){pts.push([x,base-amp*(.5+.5*Math.sin(x*.0075+ph))-amp*.5*Math.sin(x*.021+ph2)-amp*.25*r()])}return pts}
 function ridgeY(pts,x){for(let i=1;i<pts.length;i++)if(pts[i][0]>=x){const a=pts[i-1],b=pts[i],t=(x-a[0])/(b[0]-a[0]);return a[1]+(b[1]-a[1])*t}return pts[pts.length-1][1]}
-const Arena={L:{},view:null,embers:[],motes:[],t:0,glow:{c:null,p:null},
+const Arena={lite:false,L:{},view:null,embers:[],motes:[],t:0,glow:{c:null,p:null},
  build(v){this.view=v;const hw=v.halfW+100,hh=v.halfH+40,x0=480-hw,y0=270-hh,w=hw*2,h=hh*2,L=this.L={};
   this.glow.c=glowSprite('#4fe3ff');this.glow.p=glowSprite('#ff4f9a');
   L.sky=layer(v,x0,y0,w,h,(c)=>{const g=c.createLinearGradient(0,y0,0,G);g.addColorStop(0,'#04061a');g.addColorStop(.45,'#0d1336');g.addColorStop(.75,'#27194d');g.addColorStop(.92,'#5a2468');g.addColorStop(1,'#8a3380');
@@ -58,19 +58,19 @@ const Arena={L:{},view:null,embers:[],motes:[],t:0,glow:{c:null,p:null},
   if(!this.motes.length){const r=rng(9);for(let i=0;i<14;i++)this.motes.push({x:r()*960,y:200+r()*220,p:r()*6,s:.3+r()*.5,c:r()<.5?'#7defff':'#ff8cc8'})}
  },
  update(dt){this.t+=dt;const E=this.embers;
-  if(E.length<26&&Math.random()<dt*22){const t=TORCHES[(Math.random()*4)|0];E.push({x:t.x+(Math.random()-.5)*10,y:G-92,vx:(Math.random()-.5)*14,vy:-(26+Math.random()*40),life:1.2+Math.random()*1.5,max:2.5,c:COL[t.c],ph:Math.random()*6})}
+  if(E.length<(this.lite?8:26)&&Math.random()<dt*22){const t=TORCHES[(Math.random()*4)|0];E.push({x:t.x+(Math.random()-.5)*10,y:G-92,vx:(Math.random()-.5)*14,vy:-(26+Math.random()*40),life:1.2+Math.random()*1.5,max:2.5,c:COL[t.c],ph:Math.random()*6})}
   for(let i=E.length-1;i>=0;i--){const e=E[i];e.life-=dt;if(e.life<=0){E[i]=E[E.length-1];E.pop();continue}e.x+=(e.vx+Math.sin(this.t*3+e.ph)*10)*dt;e.y+=e.vy*dt}},
  draw(c,par){const L=this.L,t=this.t,v=this.view;if(!L.sky)return;
   const put=(l,k)=>c.drawImage(l.cv,l.x0-par*k,l.y0,l.w,l.h);
   put(L.sky,3);
   c.fillStyle='#fff';for(const s of this.stars){c.globalAlpha=.35+.65*Math.abs(Math.sin(t*1.6+s.p));c.fillRect(s.x-par*3,s.y,s.s,s.s)}c.globalAlpha=1;
   put(L.moon,7);put(L.far,14);
-  this.fog(c,.16,t*5,236);put(L.mid,26);this.fog(c,.2,-t*9+300,300);
+  if(!this.lite)this.fog(c,.16,t*5,236);put(L.mid,26);if(!this.lite)this.fog(c,.2,-t*9+300,300);
   put(L.stage,0);
   // torch light + flames
   c.globalCompositeOperation='lighter';
   for(let i=0;i<TORCHES.length;i++){const T=TORCHES[i],gs=this.glow[T.c],fl=.8+.2*Math.sin(t*13+i*2)+.1*Math.sin(t*23+i);
-   c.globalAlpha=.5*fl;c.drawImage(gs,T.x-110,G-92-90,220,180);c.globalAlpha=.22*fl;c.drawImage(gs,T.x-190,G-12,380,48);}
+   c.globalAlpha=.5*fl;c.drawImage(gs,T.x-110,G-92-90,220,180);if(!this.lite){c.globalAlpha=.22*fl;c.drawImage(gs,T.x-190,G-12,380,48)}}
   c.globalCompositeOperation='source-over';
   for(let i=0;i<TORCHES.length;i++){const T=TORCHES[i],f=Math.sin(t*11+i*3)*.5+Math.sin(t*17.3+i)*.5,base=G-92,h=34+f*7,col=COL[T.c];
    c.fillStyle=col;c.globalAlpha=.9;c.beginPath();c.moveTo(T.x-9,base);c.bezierCurveTo(T.x-12,base-h*.5,T.x-3+f*4,base-h*.7,T.x+f*5,base-h);c.bezierCurveTo(T.x+4+f*2,base-h*.6,T.x+12,base-h*.4,T.x+9,base);c.closePath();c.fill();
@@ -79,8 +79,8 @@ const Arena={L:{},view:null,embers:[],motes:[],t:0,glow:{c:null,p:null},
  drawFront(c,par){ // embers, motes, front fog (world space)
   const t=this.t;c.globalCompositeOperation='lighter';
   for(const e of this.embers){c.globalAlpha=Math.min(1,e.life/e.max*2)*.9;c.fillStyle=e.c;c.fillRect(e.x,e.y,2.2,2.2)}
-  for(const m of this.motes){const x=m.x+Math.sin(t*m.s+m.p)*40-par*34,y=m.y+Math.cos(t*m.s*1.3+m.p)*18;c.globalAlpha=.25+.35*Math.sin(t*2+m.p)**2;c.fillStyle=m.c;c.fillRect(x,y,2.5,2.5)}
-  c.globalAlpha=1;c.globalCompositeOperation='source-over';this.fog(c,.12,t*14,G-30)},
+  if(!this.lite)for(const m of this.motes){const x=m.x+Math.sin(t*m.s+m.p)*40-par*34,y=m.y+Math.cos(t*m.s*1.3+m.p)*18;c.globalAlpha=.25+.35*Math.sin(t*2+m.p)**2;c.fillStyle=m.c;c.fillRect(x,y,2.5,2.5)}
+  c.globalAlpha=1;c.globalCompositeOperation='source-over';if(!this.lite)this.fog(c,.12,t*14,G-30)},
  fog(c,a,off,y){const f=this.L.fog,x0=this.view?480-this.view.halfW-100:0,n=Math.ceil((this.view.halfW*2+200)/960)+1;let s=((off%960)+960)%960;c.globalAlpha=a;
   for(let i=0;i<n;i++)c.drawImage(f.cv,x0-960+s+i*960,y-60,960,150);c.globalAlpha=1}
 };

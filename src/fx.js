@@ -1,11 +1,10 @@
 /* DuelForge — particles, screen shake, floaters and tiny synthesized SFX */
 (function(){
 const DF=window.DF=window.DF||{};
-const MAXP=140;
 const FX={
- parts:[],floaters:[],shakeAmp:0,shakeX:0,shakeY:0,
+ max:140,parts:[],floaters:[],shakeAmp:0,shakeX:0,shakeY:0,
  reset(){this.parts.length=0;this.floaters.length=0;this.shakeAmp=0},
- add(p){if(this.parts.length>=MAXP)this.parts.shift();this.parts.push(p)},
+ add(p){if(this.parts.length>=this.max)this.parts.shift();this.parts.push(p)},
  sparks(x,y,dir,n,col,spd){for(let i=0;i<n;i++){const a=(Math.random()-.5)*2.4+(dir>0?0:Math.PI);const s=(.4+Math.random())*spd;
    this.add({k:0,x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-60,life:.28+Math.random()*.25,max:.5,col})}},
  shards(x,y,n,col){for(let i=0;i<n;i++){const a=Math.random()*6.283,s=120+Math.random()*260;
@@ -56,6 +55,7 @@ const SFX={ctx:null,muted:false,noise:null,
  hit(h){this.tone(h?90:140,.18,'square',.18,.4);this.hiss(.1,.3,3500,800);if(h)this.tone(55,.3,'sine',.3,.5)},
  jump(){this.tone(260,.12,'sine',.07,1.8)},dash(){this.hiss(.18,.12,2500,500)},
  ko(){this.tone(180,.6,'sawtooth',.14,.25);this.hiss(.5,.2,2000,150)},
+ charge(){this.tone(140,.55,'sawtooth',.07,3.2)},heavy(){this.tone(70,.4,'square',.2,.4);this.hiss(.28,.3,900,120)},
  ui(){this.tone(620,.07,'triangle',.08,1.3)},fight(){this.tone(300,.3,'sawtooth',.1,2);this.tone(450,.3,'square',.05,2)},
  win(){[523,659,784,1046].forEach((f,i)=>setTimeout(()=>this.tone(f,.3,'triangle',.12),i*110))}
 };
