@@ -254,3 +254,34 @@ input{background:#0a0806;border-color:#4a3b27}
 body.lowfx .pk-card.sel{transform:none}
 .pk-key{display:inline-block;font:700 8px/1 system-ui;font-style:normal;color:#9a8e76;border:1px solid #4a3b27;border-radius:3px;padding:2px 3px;margin-right:5px;vertical-align:1px;letter-spacing:0}
 body.touch .pk-key{display:none}
+/* =========================================================
+   SUPABASE AUTH
+   ========================================================= */
+
+#authScreen .auth-card {
+  width: min(92vw, 420px);
+}
+
+#authScreen input {
+  width: 100%;
+  box-sizing: border-box;
+  letter-spacing: normal;
+}
+
+#authScreen #authMessage {
+  min-height: 24px;
+  margin: 10px 0;
+}
+
+#authScreen .auth-error {
+  color: var(--danger, #b8322f);
+}
+
+#authScreen .auth-success {
+  color: var(--green, #5fbf75);
+}
+
+#authScreen button:disabled {
+  opacity: .55;
+  pointer-events: none;
+ }
