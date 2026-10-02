@@ -18,10 +18,11 @@ const CATALOG={
  effect_void:{category:'effect',name:'Void Impact',price:300,upgrade:180,max:3,desc:'Dark impact effect',stats:{}}
 };
 const P={profile:{id:null,display_name:'PLAYER',coins:500,xp:0,rank:1,mp_wins:0,mp_losses:0,bot_wins:0,settings:{}},items:[]};
-let ready=false, loading=false;
-function merge(payload){if(!payload)return;const p=payload.profile||{};Object.assign(P.profile,p);P.items=payload.items||[];ready=true;render();}
+let ready=false, loading=false, loadPromise=null;
+function notify(){try{DF.Progression&&DF.Progression.onChange&&DF.Progression.onChange(P)}catch(e){}}
+function merge(payload){if(!payload)return;const p=payload.profile||{};Object.assign(P.profile,p);P.items=payload.items||[];ready=true;render();notify();}
 async function rpc(name,args){const s=S();if(!s)throw Error('Supabase is not configured.');const {data,error}=await s.rpc(name,args||{});if(error)throw error;return data}
-async function load(){if(loading)return;loading=true;try{const s=S();const ses=await s.auth.getSession();const uid=ses&&ses.data&&ses.data.session&&ses.data.session.user&&ses.data.session.user.id;if(!uid)throw Error('not authenticated');const data=await rpc('duelforge_get_progress');merge(data);localStorage.setItem('duelforge.cachedProgress.'+uid,JSON.stringify(P));}catch(e){console.warn('Progression load failed:',e)}finally{loading=false}}
+async function load(){if(loading)return loadPromise;loading=true;loadPromise=(async()=>{try{const s=S();const ses=await s.auth.getSession();const uid=ses&&ses.data&&ses.data.session&&ses.data.session.user&&ses.data.session.user.id;if(!uid)throw Error('not authenticated');const data=await rpc('duelforge_get_progress');merge(data);localStorage.setItem('duelforge.cachedProgress.'+uid,JSON.stringify(P));return data}catch(e){console.warn('Progression load failed:',e);throw e}})();try{return await loadPromise}finally{loading=false;loadPromise=null}}
 function owned(id){return P.items.find(x=>x.id===id)}
 function item(id){return CATALOG[id]||null}
 function levelStats(c,l){const k=Math.max(0,l-1);const out={};for(const x in c.stats)out[x]=typeof c.stats[x]==='number'?c.stats[x]*(1+k*.22):c.stats[x];return out}
@@ -33,7 +34,7 @@ async function equip(id){const data=await rpc('duelforge_equip_item',{p_item_id:
 async function setName(name,settings){const data=await rpc('duelforge_set_profile',{p_name:name,p_settings:settings||null});merge(data)}
 async function setSettings(settings){const data=await rpc('duelforge_set_profile',{p_name:P.profile.display_name||'PLAYER',p_settings:settings||{}});merge(data)}
 async function claim(matchId,won,rounds,ranked){const data=await rpc('duelforge_claim_match',{p_match_id:matchId,p_won:!!won,p_rounds:rounds|0,p_ranked:!!ranked});merge(data);return true}
-async function leaderboard(){try{return await rpc('duelforge_leaderboard')}catch(e){return []}}
+async function leaderboard(){return await rpc('duelforge_leaderboard')}
 function inject(){if(document.getElementById('store'))return;
  const home=document.querySelector('.menu');if(home){
   const mk=(id,ico,title,sub)=>{const b=document.createElement('button');b.className='mbtn';b.id=id;b.innerHTML=`<span class="ico">${ico}</span><span class="lbl"><b>${title}</b><small>${sub}</small></span><span class="chev">›</span>`;return b};
@@ -67,6 +68,6 @@ function render(){
   return `<article class="store-item ${i?'owned':''}"><div class="store-cat">${c.category.replace('_',' ')}</div><h3>${c.name}</h3><p>${c.desc}</p><div class="store-level">${i?`LEVEL ${lv}/${c.max}`:'LOCKED'}</div><small>${i&&c.upgrade?`Next level: +${Math.round((levelStats(c,lv+1).damage||levelStats(c,lv+1).defense||levelStats(c,lv+1).speed||0)*100)}% · Upgrade ${cost}`:'Price '+c.price}</small><div class="store-actions"><button data-act="${i?(max?'equip':'upgrade'):'buy'}" data-id="${c.id}" class="${i&&i.equipped?'secondary':'primary'}">${i?(max?(i.equipped?'EQUIPPED':'EQUIP'):'UPGRADE '+cost):'BUY '+c.price}</button></div></article>`}).join('');
  g.querySelectorAll('button').forEach(b=>b.onclick=async()=>{const msg=document.getElementById('storeMsg');b.disabled=true;try{if(b.dataset.act==='buy')await buy(b.dataset.id);else if(b.dataset.act==='upgrade')await upgrade(b.dataset.id);else await equip(b.dataset.id);msg.className='message';msg.textContent='Forge updated.'}catch(e){msg.className='message bad';msg.textContent=e.message||'Forge action failed.'}finally{b.disabled=false;render()}});
 }
-inject();DF.Progression={state:P,catalog:CATALOG,load,owned,item,combat,setName,setSettings,claim,leaderboard,buy,upgrade,equip,ready:()=>ready};
+inject();DF.Progression={state:P,catalog:CATALOG,load,owned,item,combat,setName,setSettings,claim,leaderboard,buy,upgrade,equip,ready:()=>ready,onChange:null};
 window.addEventListener('DOMContentLoaded',load);
 })();

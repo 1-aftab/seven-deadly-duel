@@ -20,12 +20,14 @@ try{let s=JSON.parse(localStorage.getItem(KEY)||'null');
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify({player:{name:state.player.name},muted:state.muted,gfx:state.gfx}))}catch(e){}};
  const syncCloud=()=>{const P=DF.Progression&&DF.Progression.state&&DF.Progression.state.profile;if(!P)return;state.player.name=P.display_name||state.player.name;state.player.coins=P.coins|0;state.player.xp=P.xp|0;state.player.rank=P.rank|0;state.player.mpWins=P.mp_wins|0;state.player.mpLosses=P.mp_losses|0;state.player.botWins=P.bot_wins|0;if(P.settings&&typeof P.settings==='object'){if(typeof P.settings.sound==='boolean')state.muted=!P.settings.sound;if(P.settings.gfx==='low'||P.settings.gfx==='auto')state.gfx=P.settings.gfx;SFX.muted=state.muted;} };
 SFX.muted=state.muted;
+DF.Progression&&(DF.Progression.onChange=()=>{syncCloud();updateHome();if(cur==='settings')updateSettings()});
 const ico=(n,c)=>'<svg class="i '+(c||'')+'" aria-hidden="true"><use href="#i-'+n+'"/></svg>';
 
 const screens=['splash','authScreen','nameScreen','home','mp','room','leaderboard','settings','store','profile','duel','result'];
 let cur='splash';
 function show(id){cur=id;screens.forEach(s=>$(s).classList.toggle('active',s===id));document.body.classList.toggle('in-duel',id==='duel');
  if(id==='home')updateHome();if(id==='leaderboard')renderBoard();if(id==='settings')updateSettings();if(id!=='duel'){Match.active=false}window.scrollTo(0,0)}
+DF.show=show;
 const hasRank=()=>state.player.mpWins+state.player.mpLosses>0;
 const W=x=>x===state.player?x.mpWins:x.wins,Lo=x=>x===state.player?x.mpLosses:x.losses;
 function ranked(){const l=[...state.board];if(hasRank())l.push(state.player);return l.sort((a,b)=>W(b)-W(a)||Lo(a)-Lo(b)||(a===state.player?-1:b===state.player?1:0))}
@@ -33,15 +35,25 @@ const myRank=()=>{const i=ranked().indexOf(state.player);return i<0?0:i+1};
 function updateHome(){const r=myRank();$('homeWins').textContent=state.player.mpWins;$('homeCoins').textContent=state.player.coins.toLocaleString();$('homeRank').textContent=r?'#'+r:'\u2014';
  $('playerName').textContent=state.player.name||'PLAYER';$('avatar').textContent=(state.player.name||'?')[0];$('muteBtn').innerHTML=ico(state.muted?'mute':'vol')}
 async function renderBoard(){
-  syncCloud(); const P=state.player;
-  $('meCard').innerHTML=`<span class="big">${myRank()?'#'+myRank():'—'}</span><div><b>${escapeHtml(P.name||'PLAYER')}</b><small>${P.mpWins} WINS · ${P.mpLosses} LOSSES · MULTIPLAYER</small></div>`;
-  const rows=DF.Progression?await DF.Progression.leaderboard():[];
-  state.board=(rows||[]).map(x=>({name:x.display_name,wins:x.mp_wins,losses:x.mp_losses,mp_wins:x.mp_wins,mp_losses:x.mp_losses,rank:x.rank}));
-  const all=ranked(),r=myRank();
-  $('board').innerHTML='<div class="row header"><span>#</span><span>FIGHTER</span><span>WINS</span><span>LOSSES</span></div>'+
-   all.map((x,i)=>`<div class="row ${x===P?'me':''}"><span class="rk ${i<3?'r'+(i+1):''}">${i+1}</span><span class="nm"><span class="avatar">${escapeHtml((x.name||'?')[0])}</span><b>${escapeHtml(x.name||'PLAYER')}</b>${x===P?'<span class="tag-npc">YOU</span>':''}</span><b>${W(x)}</b><b>${Lo(x)}</b></div>`).join('');
-  const note=$('boardNote');if(note)note.textContent='Live Supabase leaderboard · multiplayer results are shared across accounts and devices.';
-}
+  const note=$('boardNote');
+  try{
+    if(DF.Progression)await DF.Progression.load();
+    syncCloud();
+    const P=state.player;
+    $('meCard').innerHTML=`<span class="big">${myRank()?'#'+myRank():'—'}</span><div><b>${escapeHtml(P.name||'PLAYER')}</b><small>${P.mpWins} WINS · ${P.mpLosses} LOSSES · MULTIPLAYER</small></div>`;
+    const rows=DF.Progression?await DF.Progression.leaderboard():[];
+    state.board=(rows||[]).map(x=>({name:x.display_name,wins:x.mp_wins|0,losses:x.mp_losses|0,mp_wins:x.mp_wins|0,mp_losses:x.mp_losses|0,rank:x.rank|0}));
+    const all=ranked();
+    $('board').innerHTML='<div class="row header"><span>#</span><span>FIGHTER</span><span>WINS</span><span>LOSSES</span></div>'+
+      (all.length?all.map((x,i)=>`<div class="row ${x===P?'me':''}"><span class="rk ${i<3?'r'+(i+1):''}">${i+1}</span><span class="nm"><span class="avatar">${escapeHtml((x.name||'?')[0])}</span><b>${escapeHtml(x.name||'PLAYER')}</b>${x===P?'<span class="tag-npc">YOU</span>':''}</span><b>${W(x)}</b><b>${Lo(x)}</b></div>`).join(''):'<div class="row"><span></span><span>No ranked players yet.</span><span>0</span><span>0</span></div>');
+    if(note)note.textContent='Live Supabase leaderboard · shared across registered accounts and devices.';
+  }catch(e){
+    console.warn('Leaderboard load failed:',e);
+    state.board=[];
+    if(note)note.textContent='Leaderboard could not be loaded. Check that the Supabase DuelForge SQL was run successfully.';
+    $('board').innerHTML='<div class="message bad">Could not load the shared leaderboard.</div>';
+  }
+} 
 
 /* ================= input ================= */
 const Input={left:false,right:false,j:0,a:0,d:0,h:0,
@@ -249,15 +261,20 @@ const Match={
   // HUD
   setBar('hero',this.p1.hp);setBar('enemy',this.p2.hp);setCds(this.me?this.p2:this.p1);const tl=Math.ceil(this.timeLeft);if(hudCache.t!==tl){hudCache.t=tl;$('timer').textContent=tl;$('timer').classList.toggle('low',tl<=10)}
  },
- finish(){if(this.mode==='host'||this.mode==='guest')this.rematchFlags={me:false,opp:false};
+ async finish(){if(this._finishing)return;this._finishing=true;if(this.mode==='host'||this.mode==='guest')this.rematchFlags={me:false,opp:false};
   const me=this.me,won=this.score[me]>=4,rw=this.score[me],base=won?150:50,coins=base+rw*10;
-  const ranked=this.mode!=='bot',P=state.player;P.coins+=coins;if(ranked){if(won)P.mpWins++;else P.mpLosses++}else if(won)P.botWins++;save();this.active=false;
+  const ranked=this.mode!=='bot';
+  this.active=false;
+  let saved=false;
+  for(let attempt=0;attempt<2&&!saved;attempt++){
+    try{if(DF.Progression){await DF.Progression.claim(this.matchId,won,rw,ranked);syncCloud();saved=true}}catch(e){console.warn('Match reward save failed:',e);if(attempt===0)await new Promise(r=>setTimeout(r,500))}
+  }
   $('finalMy').textContent=this.score[me];$('finalBot').textContent=this.score[1-me];
   $('resultIcon').innerHTML=ico(won?'trophy':'sword');$('resultEyebrow').textContent=(ranked?'RANKED DUEL ':'PRACTICE DUEL ')+(won?'WON':'LOST');$('resultTitle').textContent=won?'VICTORY':'DEFEAT';
-  $('resultTitle').className=won?'win':'lose';$('rewardWins').textContent=ranked?'+1':'\u2014';$('rewardWinsLbl').textContent=ranked?(won?'RANKED WIN':'RANKED LOSS'):'UNRANKED';
-  $('rewardNote').textContent=`${base} base + ${rw} rounds × 10`+(ranked?'':' \u00b7 practice duels never count toward the leaderboard');
+  $('resultTitle').className=won?'win':'lose';$('rewardWins').textContent=ranked?'+1':'—';$('rewardWinsLbl').textContent=ranked?(won?'RANKED WIN':'RANKED LOSS'):'UNRANKED';
+  $('rewardNote').textContent=`${base} base + ${rw} rounds × 10`+(ranked?'':' · practice duels never count toward the leaderboard')+(saved?'':' · reward could not be saved');
   const el=$('rewardCoins');let t0=performance.now();(function tick(n){const k=clamp((n-t0)/900,0,1);el.textContent='+'+Math.round(coins*(1-Math.pow(1-k,3)));if(k<1)requestAnimationFrame(tick)})(t0);
-  $('rematchBtn').disabled=false;$('rematchBtn').textContent=this.mode==='bot'?'REMATCH':'REMATCH (BOTH PLAYERS)';show('result')},
+  $('rematchBtn').disabled=false;$('rematchBtn').textContent=this.mode==='bot'?'REMATCH':'REMATCH (BOTH PLAYERS)';this._finishing=false;show('result')},
  pause(on){if(this.mode==='bot')this.paused=on;$('pauseMenu').hidden=!on;if(!on)last=performance.now()},
  quit(){this.paused=false;this.active=false;$('pauseMenu').hidden=true;if(this.mode!=='bot'){Net.send({t:'quit'});Net.close()}show('home')}
 };
@@ -314,6 +331,8 @@ async function continueAfterAuth(){
       session.data.session
     ){
 
+      if(DF.Progression)await DF.Progression.load();
+      syncCloud();
       if(state.player.name)
         show('home');
       else
@@ -367,13 +386,11 @@ $('splash').addEventListener(
 
 /* Called by auth.js after successful login/signup */
 
-window.DuelForgeAuthReady=function(){
-
-  if(state.player.name)
-    show('home');
-  else
-    openName(false);
-
+window.DuelForgeAuthReady=async function(){
+  try{if(DF.Progression)await DF.Progression.load()}catch(e){}
+  syncCloud();
+  if(state.player.name)show('home');
+  else openName(false);
 };
 
 /* ================= multiplayer: 4-digit room codes ================= */
@@ -415,7 +432,7 @@ function onNet(m){
  switch(m.t){
   case'hello':remoteName=String(m.name||'OPPONENT').slice(0,14);if(m.mods)Match.p2.mods=m.mods;
    if(Net.role==='host'){setSlot(2,remoteName,'GUEST',true);roomMsg('Opponent joined! Starting…',false);clearTimeout(roomT);
-    roomT=setTimeout(()=>{if(!Net.open||cur!=='room')return;const seed=(Math.random()*1e9)|0,names=[state.player.name,remoteName];Net.send({t:'start',names,seed});Match.start({mode:'host',names,seed})},1800)}
+    roomT=setTimeout(()=>{if(!Net.open||cur!=='room')return;const seed=(Math.random()*1e9)|0,names=[state.player.name,remoteName];const matchId=((crypto&&crypto.randomUUID)?crypto.randomUUID():'m_'+Date.now()+'_'+Math.random().toString(36).slice(2));Net.send({t:'start',names,seed,matchId});Match.start({mode:'host',names,seed,matchId})},1800)}
    else{setSlot(1,remoteName,'HOST',true);roomMsg('Joined! The match starts in a moment',true)}break;
   case'start':clearTimeout(roomT);Match.start({mode:'guest',names:m.names,seed:m.seed,matchId:m.matchId});break;
   case'in':if(Match.mode==='host')Match.remote={l:m.l,r:m.r,j:m.j,a:m.a,d:m.d,h:m.h|0,st:m.st|0};break;
@@ -433,5 +450,5 @@ function onNet(m){
  }}
 
 syncCloud();applyGfx();updateHome();
-DF.Match=Match;DF.step=dt=>{Match.update(dt);render()};
+DF.Match=Match;DF.step=dt=>{Match.update(dt);render()};DF.show=show;
 })();

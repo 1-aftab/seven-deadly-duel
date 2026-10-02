@@ -1,84 +1,107 @@
-/* DuelForge — peer-to-peer rooms with 4-digit codes.
-   Signaling (only to exchange the WebRTC handshake) goes through the free public PeerJS broker over a plain WebSocket;
-   the room code is simply the host's broker id ("dfrg26-" + 4 digits). Gameplay then runs directly peer-to-peer over a
-   WebRTC data channel. No library, no backend of our own. Swap SIGNAL/ICE below to use your own broker or a TURN server. */
+/* DuelForge multiplayer — PeerJS/WebRTC transport.
+   Keeps the existing room-code flow and game protocol, but lets PeerJS own
+   signaling/ICE lifecycle instead of manually speaking the PeerServer socket protocol. */
 (function(){
+'use strict';
 const DF=window.DF=window.DF||{};
-const SIGNAL='wss://0.peerjs.com/peerjs?key=peerjs';
+const ICE=[
+  {urls:'stun:stun.l.google.com:19302'},
+  {urls:'stun:stun1.l.google.com:19302'}
+];
 const PREFIX='dfrg26-';
-const ICE=[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]; // add a TURN server here for strict mobile networks
 const rnd=n=>{let s='';const a='abcdefghijklmnopqrstuvwxyz0123456789';for(let i=0;i<n;i++)s+=a[(Math.random()*a.length)|0];return s};
-const Net={ws:null,pc:null,dc:null,role:null,code:'',open:false,peer:null,cid:'',pend:[],hb:0,tmo:0,
- onopen:null,onclose:null,onmessage:null,onerror:null,
- supported(){return!!(window.RTCPeerConnection&&window.WebSocket)},
- _err(m){this.onerror&&this.onerror(m)},
- /* open a signaling socket registered under `id`; resolves when the broker says OPEN, rejects 'taken' / 'server' */
- _sig(id){return new Promise((res,rej)=>{let done=false,ws;
-   try{ws=new WebSocket(SIGNAL+'&id='+id+'&token='+rnd(10))}catch(e){return rej(new Error('server'))}
-   this.ws=ws;const fail=m=>{if(!done){done=true;rej(new Error(m))}};
-   const t=setTimeout(()=>{fail('server');try{ws.close()}catch(e){}},9000);
-   ws.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch(x){return}
-    switch(m.type){
-     case'OPEN':if(!done){done=true;clearTimeout(t);clearInterval(this.hb);this.hb=setInterval(()=>this._tx({type:'HEARTBEAT'}),8000);res()}break;
-     case'ID-TAKEN':clearTimeout(t);fail('taken');break;
-     case'ERROR':case'INVALID-KEY':clearTimeout(t);fail('server');break;
-     case'EXPIRE':if(this.role==='guest'&&!this.open)this._err('Room not found. Check the code and try again.');break;
-     default:this._onSig(m)}};
-   ws.onerror=()=>{clearTimeout(t);fail('server')};
-   ws.onclose=()=>{clearTimeout(t);clearInterval(this.hb);if(!done)fail('server');else if(this.ws===ws&&!this.open&&this.role)this._err('Lost connection to the room server.')}})},
- _tx(o){if(this.ws&&this.ws.readyState===1)try{this.ws.send(JSON.stringify(o))}catch(e){}},
- _pc(){this.pc=new RTCPeerConnection({iceServers:ICE});this.pend=[];
-  this.pc.onicecandidate=e=>{if(e.candidate&&this.peer)this._tx({type:'CANDIDATE',dst:this.peer,payload:{candidate:e.candidate.toJSON?e.candidate.toJSON():e.candidate,type:'data',connectionId:this.cid}})};
-  this.pc.onconnectionstatechange=()=>{
-    const s=this.pc&&this.pc.connectionState;
-    if(s==='connected'){this.tmo&&clearTimeout(this.tmo);return}
-    if(s==='disconnected'){
-      clearTimeout(this.tmo);
-      /* ICE can transiently disconnect on mobile. Give it a short recovery window. */
-      if(this.dc&&this.dc.readyState==='open')return;
-      this.tmo=setTimeout(()=>{if(this.pc&&this.pc.connectionState==='disconnected')this._resetPeer('Connection dropped. Waiting for the opponent to reconnect.')},4500);
+
+const Net={
+  peer:null,conn:null,role:null,code:'',open:false,peerId:'',connecting:false,
+  onopen:null,onclose:null,onmessage:null,onerror:null,onjoining:null,
+  supported(){return !!(window.RTCPeerConnection&&window.WebSocket&&window.Peer)},
+  _err(m){if(this.onerror)this.onerror(m)},
+  _destroyPeer(){const p=this.peer;this.peer=null;this.peerId='';try{p&&p.destroy()}catch(e){}},
+  _bindConn(conn){
+    if(!conn)return;
+    if(this.conn&&this.conn!==conn){try{conn.close()}catch(e){};return}
+    this.conn=conn;this.connecting=true;
+    if(this.role==='host'&&this.onjoining)this.onjoining();
+    conn.on('open',()=>{
+      this.open=true;this.connecting=false;
+      if(this.onopen)this.onopen();
+    });
+    conn.on('data',data=>{
+      try{this.onmessage&&this.onmessage(typeof data==='string'?JSON.parse(data):data)}catch(e){console.warn('Net message error',e)}
+    });
+    conn.on('close',()=>{
+      const wasOpen=this.open;this.open=false;this.connecting=false;this.conn=null;
+      if(wasOpen&&this.onclose)this.onclose();
+    });
+    conn.on('error',err=>{
+      console.warn('Peer data connection error',err);
+      if(!this.open)this._err('Could not establish the room connection. Check the room code and try again.');
+    });
+  },
+  _makePeer(id){
+    return new Promise((resolve,reject)=>{
+      let settled=false;
+      let p;
+      try{p=new Peer(id,{config:{iceServers:ICE}})}catch(e){reject(e);return}
+      this.peer=p;
+      const fail=e=>{if(settled)return;settled=true;try{p.destroy()}catch(x){};if(this.peer===p)this.peer=null;reject(e||new Error('server'))};
+      p.once('open',pid=>{if(settled)return;settled=true;this.peerId=pid;resolve(p)});
+      p.on('error',err=>{if(!settled)fail(err);else console.warn('PeerJS error',err)});
+      p.on('disconnected',()=>{
+        if(this.open)return;
+        if(this.role)this._err('Lost connection to the room server. Please create/join the room again.');
+      });
+      p.on('close',()=>{
+        if(this.peer!==p)return;
+        const wasOpen=this.open;this.open=false;this.peer=null;this.conn=null;
+        if(wasOpen&&this.onclose)this.onclose();
+      });
+    });
+  },
+  async host(){
+    this.close();this.role='host';
+    for(let attempt=0;attempt<8;attempt++){
+      const code=String(1000+((Math.random()*9000)|0));
+      try{
+        const p=await this._makePeer(PREFIX+code);
+        this.code=code;
+        p.on('connection',conn=>{
+          if(this.conn||this.open){try{conn.close()}catch(e){};return}
+          this.peer= p;this.peerId=p.id;this.code=code;this._bindConn(conn);
+        });
+        return code;
+      }catch(e){
+        const type=e&&e.type;
+        this._destroyPeer();
+        if(type!=='unavailable-id'&&type!=='unavailable-id'){
+          this.role=null;
+          throw new Error('Room server unreachable. Check your internet and try again.');
+        }
+      }
     }
-    if(s==='failed'||s==='closed')this._resetPeer(s==='failed'?'Could not connect. Waiting for another join attempt.':'Connection closed.');
-  };
- },
- _resetPeer(msg){
-  const wasOpen=this.open;this.open=false;clearTimeout(this.tmo);
-  try{this.dc&&this.dc.close()}catch(e){} try{this.pc&&this.pc.close()}catch(e){}
-  this.dc=null;this.pc=null;this.peer=null;this.cid='';this.pend=[];
-  if(wasOpen)this.onclose&&this.onclose();else if(msg&&this.role==='guest')this._err(msg);
- },
- _setup(dc){this.dc=dc;dc.onopen=()=>{this.open=true;clearTimeout(this.tmo);this._shutSig();this.onopen&&this.onopen()};
-  dc.onclose=()=>{this._resetPeer()};
-  dc.onmessage=e=>{try{this.onmessage&&this.onmessage(JSON.parse(e.data))}catch(x){}}},
- _shutSig(){clearInterval(this.hb);const w=this.ws;this.ws=null;try{w&&w.close()}catch(e){}},
- async _flush(){const p=this.pend;this.pend=[];for(const c of p)try{await this.pc.addIceCandidate(c)}catch(e){}},
- async _onSig(m){const p=m.payload||{};
-  try{
-   if(m.type==='OFFER'&&this.role==='host'){if(this.open)return; if(this.pc&&(this.pc.connectionState==='failed'||this.pc.connectionState==='closed'||this.pc.connectionState==='disconnected'))this._resetPeer(); if(this.pc)return;
-     this.peer=m.src;this.cid=p.connectionId||'';this._pc();this.pc.ondatachannel=e=>this._setup(e.channel);
-     await this.pc.setRemoteDescription(p.sdp);await this._flush();const a=await this.pc.createAnswer();await this.pc.setLocalDescription(a);
-     this._tx({type:'ANSWER',dst:this.peer,payload:{sdp:{type:a.type,sdp:a.sdp},type:'data',connectionId:this.cid}});
-     this.onjoining&&this.onjoining();
-     this.tmo=setTimeout(()=>{if(!this.open){this._resetPeer();this._err('Opponent could not connect. The room is ready for another join attempt.')}},15000)}
-   else if(m.type==='ANSWER'&&this.role==='guest'&&this.pc){await this.pc.setRemoteDescription(p.sdp);await this._flush()}
-   else if(m.type==='CANDIDATE'&&this.pc&&p.candidate){if(this.pc.remoteDescription)await this.pc.addIceCandidate(p.candidate).catch(()=>{});else this.pend.push(p.candidate)}
-  }catch(e){this._err('Connection error.')}},
- /* HOST: reserve a random free 4-digit code */
- async host(){this.close();this.role='host';
-  for(let i=0;i<10;i++){const code=String(1000+((Math.random()*9000)|0));
-   try{await this._sig(PREFIX+code);this.code=code;return code}catch(e){this._shutSig();if(e.message!=='taken'){this.role=null;throw new Error('Room server unreachable. Check your internet and try again.')}}}
-  this.role=null;throw new Error('No free room codes right now. Try again.')},
- /* GUEST: join the room with that 4-digit code */
- async join(code){this.close();this.role='guest';this.code=code;this.peer=PREFIX+code;this.cid='dc_'+rnd(10);
-  try{await this._sig(PREFIX+'g'+rnd(9))}catch(e){this.role=null;throw new Error('Room server unreachable. Check your internet and try again.')}
-  this._pc();this._setup(this.pc.createDataChannel('duel',{ordered:true}));
-  const o=await this.pc.createOffer();await this.pc.setLocalDescription(o);
-  this._tx({type:'OFFER',dst:this.peer,payload:{sdp:{type:o.type,sdp:o.sdp},type:'data',connectionId:this.cid,label:'duel',reliable:true,serialization:'json'}});
-  this.tmo=setTimeout(()=>{if(!this.open){this._resetPeer();this._err('Room not found or unreachable. Check the code.')}},12000)},
- send(o){if(this.dc&&this.dc.readyState==='open'){try{this.dc.send(JSON.stringify(o))}catch(e){}}},
- close(){const o=this.open;this.open=false;clearTimeout(this.tmo);this._shutSig();try{this.dc&&this.dc.close()}catch(e){}try{this.pc&&this.pc.close()}catch(e){}
-  this.dc=this.pc=null;this.peer=null;this.role=null;this.pend=[];this.cid='';return o}
+    this.role=null;throw new Error('No free room codes right now. Try again.');
+  },
+  async join(code){
+    this.close();this.role='guest';this.code=String(code).replace(/\D/g,'').slice(0,4);
+    try{
+      const p=await this._makePeer();
+      const conn=p.connect(PREFIX+this.code,{reliable:true,serialization:'json'});
+      this._bindConn(conn);
+      return this.code;
+    }catch(e){
+      this.role=null;this._destroyPeer();
+      if(e&&e.type==='peer-unavailable')throw new Error('Room not found or the host is offline. Check the 4-digit code.');
+      throw new Error('Room server unreachable. Check your internet and try again.');
+    }
+  },
+  send(o){if(this.conn&&this.conn.open){try{this.conn.send(o)}catch(e){}}},
+  close(){
+    const wasOpen=this.open;this.open=false;this.connecting=false;this.role=null;this.code='';
+    const c=this.conn;this.conn=null;try{c&&c.close()}catch(e){}
+    this._destroyPeer();
+    return wasOpen;
+  }
 };
+DF.Net=Net;
 addEventListener('pagehide',()=>Net.close());
- DF.Net=Net;
 })();
