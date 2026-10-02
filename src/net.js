@@ -29,20 +29,37 @@ const Net={ws:null,pc:null,dc:null,role:null,code:'',open:false,peer:null,cid:''
  _tx(o){if(this.ws&&this.ws.readyState===1)try{this.ws.send(JSON.stringify(o))}catch(e){}},
  _pc(){this.pc=new RTCPeerConnection({iceServers:ICE});this.pend=[];
   this.pc.onicecandidate=e=>{if(e.candidate&&this.peer)this._tx({type:'CANDIDATE',dst:this.peer,payload:{candidate:e.candidate.toJSON?e.candidate.toJSON():e.candidate,type:'data',connectionId:this.cid}})};
-  this.pc.onconnectionstatechange=()=>{const s=this.pc&&this.pc.connectionState;if((s==='failed'||s==='closed'||s==='disconnected')){if(this.open){this.open=false;this.onclose&&this.onclose()}else if(s==='failed')this._err('Could not connect. Your network may block peer-to-peer play.')}}},
+  this.pc.onconnectionstatechange=()=>{
+    const s=this.pc&&this.pc.connectionState;
+    if(s==='connected'){this.tmo&&clearTimeout(this.tmo);return}
+    if(s==='disconnected'){
+      clearTimeout(this.tmo);
+      /* ICE can transiently disconnect on mobile. Give it a short recovery window. */
+      if(this.dc&&this.dc.readyState==='open')return;
+      this.tmo=setTimeout(()=>{if(this.pc&&this.pc.connectionState==='disconnected')this._resetPeer('Connection dropped. Waiting for the opponent to reconnect.')},4500);
+    }
+    if(s==='failed'||s==='closed')this._resetPeer(s==='failed'?'Could not connect. Waiting for another join attempt.':'Connection closed.');
+  };
+ },
+ _resetPeer(msg){
+  const wasOpen=this.open;this.open=false;clearTimeout(this.tmo);
+  try{this.dc&&this.dc.close()}catch(e){} try{this.pc&&this.pc.close()}catch(e){}
+  this.dc=null;this.pc=null;this.peer=null;this.cid='';this.pend=[];
+  if(wasOpen)this.onclose&&this.onclose();else if(msg&&this.role==='guest')this._err(msg);
+ },
  _setup(dc){this.dc=dc;dc.onopen=()=>{this.open=true;clearTimeout(this.tmo);this._shutSig();this.onopen&&this.onopen()};
-  dc.onclose=()=>{if(this.open){this.open=false;this.onclose&&this.onclose()}};
+  dc.onclose=()=>{this._resetPeer()};
   dc.onmessage=e=>{try{this.onmessage&&this.onmessage(JSON.parse(e.data))}catch(x){}}},
  _shutSig(){clearInterval(this.hb);const w=this.ws;this.ws=null;try{w&&w.close()}catch(e){}},
  async _flush(){const p=this.pend;this.pend=[];for(const c of p)try{await this.pc.addIceCandidate(c)}catch(e){}},
  async _onSig(m){const p=m.payload||{};
   try{
-   if(m.type==='OFFER'&&this.role==='host'){if(this.pc||this.open)return; // one opponent per room
+   if(m.type==='OFFER'&&this.role==='host'){if(this.open)return; if(this.pc&&(this.pc.connectionState==='failed'||this.pc.connectionState==='closed'||this.pc.connectionState==='disconnected'))this._resetPeer(); if(this.pc)return;
      this.peer=m.src;this.cid=p.connectionId||'';this._pc();this.pc.ondatachannel=e=>this._setup(e.channel);
      await this.pc.setRemoteDescription(p.sdp);await this._flush();const a=await this.pc.createAnswer();await this.pc.setLocalDescription(a);
      this._tx({type:'ANSWER',dst:this.peer,payload:{sdp:{type:a.type,sdp:a.sdp},type:'data',connectionId:this.cid}});
      this.onjoining&&this.onjoining();
-     this.tmo=setTimeout(()=>{if(!this.open){try{this.pc.close()}catch(e){}this.pc=null;this.peer=null;this._err('Opponent could not connect.')}},15000)}
+     this.tmo=setTimeout(()=>{if(!this.open){this._resetPeer();this._err('Opponent could not connect. The room is ready for another join attempt.')}},15000)}
    else if(m.type==='ANSWER'&&this.role==='guest'&&this.pc){await this.pc.setRemoteDescription(p.sdp);await this._flush()}
    else if(m.type==='CANDIDATE'&&this.pc&&p.candidate){if(this.pc.remoteDescription)await this.pc.addIceCandidate(p.candidate).catch(()=>{});else this.pend.push(p.candidate)}
   }catch(e){this._err('Connection error.')}},
@@ -57,10 +74,11 @@ const Net={ws:null,pc:null,dc:null,role:null,code:'',open:false,peer:null,cid:''
   this._pc();this._setup(this.pc.createDataChannel('duel',{ordered:true}));
   const o=await this.pc.createOffer();await this.pc.setLocalDescription(o);
   this._tx({type:'OFFER',dst:this.peer,payload:{sdp:{type:o.type,sdp:o.sdp},type:'data',connectionId:this.cid,label:'duel',reliable:true,serialization:'json'}});
-  this.tmo=setTimeout(()=>{if(!this.open)this._err('Room not found or unreachable. Check the code.')},12000)},
+  this.tmo=setTimeout(()=>{if(!this.open){this._resetPeer();this._err('Room not found or unreachable. Check the code.')}},12000)},
  send(o){if(this.dc&&this.dc.readyState==='open'){try{this.dc.send(JSON.stringify(o))}catch(e){}}},
  close(){const o=this.open;this.open=false;clearTimeout(this.tmo);this._shutSig();try{this.dc&&this.dc.close()}catch(e){}try{this.pc&&this.pc.close()}catch(e){}
-  this.dc=this.pc=null;this.peer=null;this.role=null;this.pend=[];return o}
+  this.dc=this.pc=null;this.peer=null;this.role=null;this.pend=[];this.cid='';return o}
 };
-DF.Net=Net;
+addEventListener('pagehide',()=>Net.close());
+ DF.Net=Net;
 })();

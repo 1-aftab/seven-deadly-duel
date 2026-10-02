@@ -17,9 +17,9 @@ class Bot{
    const threat=oppSwinging&&dist<ow.range+30;
    if(threat&&Math.random()<.35+L*.06){
      const r=Math.random();
-     this.intent='retreat';this.hold=.35;if(r<.4&&me.dashCd<=0){I.dash=.12;set(-to)}else if(r<.7&&me.grounded){I.jump=.12}
+     this.intent='retreat';this.hold=.35;if(r<.28&&me.dashCd<=0){I.step=.12;set(-to)}else if(r<.55&&me.dashCd<=0){I.dash=.12;set(-to)}else if(r<.7&&me.grounded){I.jump=.12}
    }else if(oppRecover&&dist<range+10&&Math.random()<.8){this.intent='attack';if(me.hvCd<=0&&me.mode==='free'&&Math.random()<.45){I.heavy=.14}}
-   else if(dist>range+140&&Math.random()<.25&&me.dashCd<=0){I.dash=.12;set(to)}
+   else if(dist>range+140&&Math.random()<.25&&me.dashCd<=0){if(Math.random()<.45)I.step=.12;else I.dash=.12;set(to)}
    else if(dist>range){this.intent='approach';if(Math.random()<.08&&me.grounded){I.jump=.12}}
    else if(dist<range*.45&&Math.random()<.4){this.intent='retreat';this.hold=.25}
    else{this.intent=Math.random()<.5+L*.05?'attack':(Math.random()<.5?'wait':'retreat');this.hold=.2+Math.random()*.25}

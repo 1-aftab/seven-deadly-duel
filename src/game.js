@@ -16,12 +16,13 @@ try{let s=JSON.parse(localStorage.getItem(KEY)||'null');
  if(s){Object.assign(state.player,s.player||{});state.muted=!!s.muted;if(s.gfx==='low')state.gfx='low'}
  else{const o=JSON.parse(localStorage.getItem('duelforge.v2')||'null');if(o&&o.player){state.player.wins=o.player.wins|0;state.player.coins=o.player.coins|0||500}}}catch(e){}
 /* migrate: older versions counted every win (incl. bots) as 'wins' — those are practice wins now and never ranked */
-{const P=state.player;if(P.wins!=null){P.botWins=(P.botWins|0)+(P.wins|0);delete P.wins}P.mpWins|=0;P.mpLosses|=0;P.botWins|=0}
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify({player:state.player,muted:state.muted,gfx:state.gfx}))}catch(e){}};
+{const P=state.player;P.mpWins|=0;P.mpLosses|=0;P.botWins|=0;P.coins=Math.max(0,P.coins|0);P.xp=Math.max(0,P.xp|0);P.rank=Math.max(1,P.rank|0)}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify({player:{name:state.player.name},muted:state.muted,gfx:state.gfx}))}catch(e){}};
+ const syncCloud=()=>{const P=DF.Progression&&DF.Progression.state&&DF.Progression.state.profile;if(!P)return;state.player.name=P.display_name||state.player.name;state.player.coins=P.coins|0;state.player.xp=P.xp|0;state.player.rank=P.rank|0;state.player.mpWins=P.mp_wins|0;state.player.mpLosses=P.mp_losses|0;state.player.botWins=P.bot_wins|0;if(P.settings&&typeof P.settings==='object'){if(typeof P.settings.sound==='boolean')state.muted=!P.settings.sound;if(P.settings.gfx==='low'||P.settings.gfx==='auto')state.gfx=P.settings.gfx;SFX.muted=state.muted;} };
 SFX.muted=state.muted;
 const ico=(n,c)=>'<svg class="i '+(c||'')+'" aria-hidden="true"><use href="#i-'+n+'"/></svg>';
 
-const screens=['splash','authScreen','nameScreen','home','mp','room','leaderboard','settings','duel','result'];
+const screens=['splash','authScreen','nameScreen','home','mp','room','leaderboard','settings','store','profile','duel','result'];
 let cur='splash';
 function show(id){cur=id;screens.forEach(s=>$(s).classList.toggle('active',s===id));document.body.classList.toggle('in-duel',id==='duel');
  if(id==='home')updateHome();if(id==='leaderboard')renderBoard();if(id==='settings')updateSettings();if(id!=='duel'){Match.active=false}window.scrollTo(0,0)}
@@ -31,11 +32,16 @@ function ranked(){const l=[...state.board];if(hasRank())l.push(state.player);ret
 const myRank=()=>{const i=ranked().indexOf(state.player);return i<0?0:i+1};
 function updateHome(){const r=myRank();$('homeWins').textContent=state.player.mpWins;$('homeCoins').textContent=state.player.coins.toLocaleString();$('homeRank').textContent=r?'#'+r:'\u2014';
  $('playerName').textContent=state.player.name||'PLAYER';$('avatar').textContent=(state.player.name||'?')[0];$('muteBtn').innerHTML=ico(state.muted?'mute':'vol')}
-function renderBoard(){const all=ranked(),r=myRank(),P=state.player;
- $('meCard').innerHTML=r?`<span class="big">#${r}</span><div><b>${escapeHtml(P.name)}</b><small>${P.mpWins} WINS &middot; ${P.mpLosses} LOSSES &middot; MULTIPLAYER</small></div>`
-  :`<span class="big">&mdash;</span><div><b>${escapeHtml(P.name)}</b><small>UNRANKED &middot; FINISH A MULTIPLAYER DUEL TO ENTER THE BOARD</small></div>`;
- $('board').innerHTML='<div class="row header"><span>#</span><span>FIGHTER</span><span>WINS</span><span>LOSSES</span></div>'+
- all.map((x,i)=>`<div class="row ${x===P?'me':''}"><span class="rk ${i<3?'r'+(i+1):''}">${i+1}</span><span class="nm"><span class="avatar">${escapeHtml(x.name[0]||'?')}</span><b>${escapeHtml(x.name)}</b>${x===P?'<span class="tag-npc">YOU</span>':''}</span><b>${W(x)}</b><b>${Lo(x)}</b></div>`).join('')}
+async function renderBoard(){
+  syncCloud(); const P=state.player;
+  $('meCard').innerHTML=`<span class="big">${myRank()?'#'+myRank():'—'}</span><div><b>${escapeHtml(P.name||'PLAYER')}</b><small>${P.mpWins} WINS · ${P.mpLosses} LOSSES · MULTIPLAYER</small></div>`;
+  const rows=DF.Progression?await DF.Progression.leaderboard():[];
+  state.board=(rows||[]).map(x=>({name:x.display_name,wins:x.mp_wins,losses:x.mp_losses,mp_wins:x.mp_wins,mp_losses:x.mp_losses,rank:x.rank}));
+  const all=ranked(),r=myRank();
+  $('board').innerHTML='<div class="row header"><span>#</span><span>FIGHTER</span><span>WINS</span><span>LOSSES</span></div>'+
+   all.map((x,i)=>`<div class="row ${x===P?'me':''}"><span class="rk ${i<3?'r'+(i+1):''}">${i+1}</span><span class="nm"><span class="avatar">${escapeHtml((x.name||'?')[0])}</span><b>${escapeHtml(x.name||'PLAYER')}</b>${x===P?'<span class="tag-npc">YOU</span>':''}</span><b>${W(x)}</b><b>${Lo(x)}</b></div>`).join('');
+  const note=$('boardNote');if(note)note.textContent='Live Supabase leaderboard · multiplayer results are shared across accounts and devices.';
+}
 
 /* ================= input ================= */
 const Input={left:false,right:false,j:0,a:0,d:0,h:0,
@@ -44,13 +50,13 @@ const Input={left:false,right:false,j:0,a:0,d:0,h:0,
 const KEYMAP={a:'L',arrowleft:'L',d:'R',arrowright:'R',w:'J',arrowup:'J',' ':'J',j:'A',k:'H',u:'H',l:'D',shift:'D'};
 const held={L:false,R:false};
 addEventListener('keydown',e=>{if(!Match.active)return;const k=KEYMAP[e.key.toLowerCase()];if(!k)return;e.preventDefault();
- if(k==='L'||k==='R'){held[k]=true;Input.dir(held.L,held.R)}else if(!e.repeat)Input.press({J:'j',A:'a',D:'d',H:'h'}[k])});
+ if(k==='L'||k==='R'){if(!e.repeat)Input.tapDir(k);held[k]=true;Input.dir(held.L,held.R)}else if(!e.repeat)Input.press({J:'j',A:'a',D:'d',H:'h'}[k])});
 addEventListener('keyup',e=>{const k=KEYMAP[e.key.toLowerCase()];if(k==='L'||k==='R'){held[k]=false;Input.dir(held.L,held.R)}});
 addEventListener('blur',()=>{held.L=held.R=false;Input.clear()});
 (function touch(){
  const dpad=$('dpad');let ptr=null;
  const upd=e=>{const r=dpad.getBoundingClientRect(),x=e.clientX-r.left;const l=x<r.width*.5;Input.dir(l,!l)};
- dpad.addEventListener('pointerdown',e=>{e.preventDefault();ptr=e.pointerId;try{dpad.setPointerCapture(ptr)}catch(x){}upd(e);SFX.init();SFX.resume()});
+ dpad.addEventListener('pointerdown',e=>{e.preventDefault();ptr=e.pointerId;try{dpad.setPointerCapture(ptr)}catch(x){}upd(e);const side=e.clientX<dpad.getBoundingClientRect().left+dpad.getBoundingClientRect().width*.5?'L':'R';Input.tapDir(side);SFX.init();SFX.resume()});
  dpad.addEventListener('pointermove',e=>{if(e.pointerId===ptr)upd(e)});
  const up=e=>{if(e.pointerId===ptr){ptr=null;Input.dir(held.L,held.R)}};dpad.addEventListener('pointerup',up);dpad.addEventListener('pointercancel',up);
  [['attackBtn','a'],['heavyBtn','h'],['jumpBtn','j'],['dashBtn','d']].forEach(([id,k])=>{const b=$(id);
@@ -96,7 +102,7 @@ function setBar(side,hp){const k=side+'hp';if(hudCache[k]===hp)return;hudCache[k
 function setPips(side,n){const el=$(side+'Pips');if(!el.children.length)for(let i=0;i<4;i++)el.appendChild(document.createElement('i'));
  [...el.children].forEach((p,i)=>p.classList.toggle('on',i<n))}
 const cdAtk=$('attackBtn').querySelector('.cd'),cdPow=$('heavyBtn').querySelector('.cd'),HVCD=DF.HVCD;
-function setCds(f){const a=f.atkCd>0?clamp(f.atkCd/f.atkCdMax(),0,1):0,h=f.hvCd>0?clamp(f.hvCd/HVCD,0,1):0,qa=Math.round(a*24),qh=Math.round(h*24);
+function setCds(f){const a=f.atkCd>0?clamp(f.atkCd/f.atkCdMax(),0,1):0,pow=f.mods&&f.mods.power&&f.mods.power.stats,h=pow?(f.powerCd>0?clamp(f.powerCd/(pow.cooldown||8),0,1):0):(f.hvCd>0?clamp(f.hvCd/HVCD,0,1):0),qa=Math.round(a*24),qh=Math.round(h*24);
  if(hudCache.qa!==qa){hudCache.qa=qa;const s=qa/24;$('cdA').style.transform='scaleX('+(1-s)+')';cdAtk.style.transform='scaleY('+s+')'}
  if(hudCache.qh!==qh){hudCache.qh=qh;const s=qh/24;$('cdH').style.transform='scaleX('+(1-s)+')';cdPow.style.transform='scaleY('+s+')';$('heavyBtn').classList.toggle('ready',qh===0)}}
 function banner(main,sub,cls){const b=$('banner');$('bannerMain').textContent=main;$('bannerSub').textContent=sub||'';b.className='';void b.offsetWidth;b.className='show '+(cls||'')}
@@ -132,11 +138,11 @@ addEventListener('keydown',e=>{if(!Picker.on||!Match.active||Match.paused)return
 
 /* ================= match ================= */
 const Match={
- active:false,mode:'bot',me:0,phase:'none',phaseT:0,round:1,score:[0,0],rand:null,picks:[null,null],pickT:0,botWait:0,names:['AFTAB','ASHEN WARDEN'],
- p1:new DF.Fighter(0,'P1'),p2:new DF.Fighter(1,'P2'),bot:null,timeLeft:60,hitstop:0,slow:0,paused:false,netT:0,inT:0,lastIn:'',remote:{l:0,r:0,j:0,a:0,d:0,h:0},seen:[[0,0,0,0],[0,0,0,0]],ended:false,koShown:false,
- start(o){this.mode=o.mode;this.me=o.mode==='guest'?1:0;this.names=o.names;this.p1.name=o.names[0];this.p2.name=o.names[1];
+ active:false,mode:'bot',me:0,matchId:null,phase:'none',phaseT:0,round:1,score:[0,0],rand:null,picks:[null,null],pickT:0,botWait:0,names:['AFTAB','ASHEN WARDEN'],
+ p1:new DF.Fighter(0,'P1'),p2:new DF.Fighter(1,'P2'),bot:null,timeLeft:60,hitstop:0,slow:0,paused:false,netT:0,inT:0,lastIn:'',remote:{l:0,r:0,j:0,a:0,d:0,h:0},seen:[[0,0,0,0,0],[0,0,0,0,0]],ended:false,koShown:false,
+ start(o){this.mode=o.mode;this.me=o.mode==='guest'?1:0;this.matchId=o.matchId||((crypto&&crypto.randomUUID)?crypto.randomUUID():'m_'+Date.now()+'_'+Math.random().toString(36).slice(2));this.names=o.names;this.p1.name=o.names[0];this.p2.name=o.names[1];const localMods=DF.Progression?DF.Progression.combat():{};this.p1.mods=this.me===0?localMods:(this.p1.mods||{});this.p2.mods=this.me===1?localMods:(this.p2.mods||{});
   let s=(o.seed>>>0)||1;this.rand=()=>{s=(s+0x6D2B79F5)|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
-  Picker.hide();this.score=[0,0];this.round=1;this.picks=[null,null];this.bot=o.mode==='bot'?new DF.Bot(1):null;this.paused=false;this.ended=false;this.remote={l:0,r:0,j:0,a:0,d:0,h:0};this.seen=[[0,0,0,0],[0,0,0,0]];
+  Picker.hide();Input.step=0;this.score=[0,0];this.round=1;this.picks=[null,null];this.bot=o.mode==='bot'?new DF.Bot(1):null;this.paused=false;this.ended=false;this.remote={l:0,r:0,j:0,a:0,d:0,h:0,st:0};this.seen=[[0,0,0,0,0],[0,0,0,0,0]];
   this.hitstop=0;this.slow=0;cam.z=1;FX.reset();qual=Math.max(qual,baseQual());applyGfx();$('pauseMenu').hidden=true;
   $('heroName').textContent=this.names[0];$('enemyName').textContent=this.names[1]+(o.mode==='guest'?' (YOU)':'');
   for(const k in hudCache)delete hudCache[k];setPips('hero',0);setPips('enemy',0);$('myRounds').textContent=$('botRounds').textContent='0';
@@ -197,7 +203,7 @@ const Match={
    const bx=pv?pv.bx+(cur.bx-pv.bx)*k:cur.bx,by=pv?pv.by+(cur.by-pv.by)*k:cur.by,tx=pv?pv.tx+(cur.tx-pv.tx)*k:cur.tx,ty=pv?pv.ty+(cur.ty-pv.ty)*k:cur.ty;
    for(let j=0;j<=6;j++){const u=j/6,px=bx+(tx-bx)*u,py=by+(ty-by)*u;if(px>x0&&px<x1&&py>y0&&py<y1){hit={x:px,y:py};break}}}
   if(!pv)att.prevSeg=this._pv;Object.assign(att.prevSeg,cur);return hit},
- applyHit(att,def,h){const w=att.weapon,hv=!!att.atk.heavy,dmg=att.atk.dmg,kb=w.kb*(hv?1.5:1),up=w.up*(hv?1.3:1),dir=def.x>=att.x?1:-1;att.atk.hit=true;def.hp=Math.max(0,def.hp-dmg);
+ applyHit(att,def,h){const w=att.weapon,hv=!!att.atk.heavy,defense=(def.mods&&def.mods.armor&&def.mods.armor.stats.defense||0)+(def.powerKind==='shield'&&def.powerT>0?(def.mods&&def.mods.power&&def.mods.power.stats.defense||.35):0),dmg=Math.max(1,Math.round(att.atk.dmg*(1-Math.min(.45,defense)))),kb=w.kb*(hv?1.5:1),up=w.up*(hv?1.3:1),dir=def.x>=att.x?1:-1;att.atk.hit=true;def.hp=Math.max(0,def.hp-dmg);
   const ko=def.hp<=0;if(ko)def.die(dir,kb);else def.hurt(dir,kb,def.grounded?up:up*.5,.22+kb/2200);
   this.fxHit(att.side,h.x,h.y,dmg,ko,dir,hv);if(this.mode==='host')Net.send({t:'hit',s:att.side,x:Math.round(h.x),y:Math.round(h.y),k:ko?1:0,d:dir,g:dmg,v:hv?1:0});return ko},
  fxHit(side,x,y,dmg,ko,dir,hv){const att=side?this.p2:this.p1,def=side?this.p1:this.p2,w=att.weapon,col=att.pal.accent,heavy=hv||w.dmg>=20;
@@ -217,14 +223,15 @@ const Match={
   if(this.phase==='fight'){this.timeLeft-=h;
    if(k1&&k2)this.endRound(-1,true);else if(k1)this.endRound(0,true);else if(k2)this.endRound(1,true);
    else if(this.timeLeft<=0){this.timeLeft=0;this.endRound(a.hp===b.hp?-1:a.hp>b.hp?0:1,false)}}},
- feed(f,st){f.input.left=!!st.l;f.input.right=!!st.r;const i=f.side,s=this.seen[i];if(st.j!==s[0]){s[0]=st.j;f.input.jump=.14}if(st.a!==s[1]){s[1]=st.a;f.input.attack=.14}if(st.d!==s[2]){s[2]=st.d;f.input.dash=.14}if(st.h!==s[3]){s[3]=st.h|0;f.input.heavy=.14}},
+ feed(f,st){f.input.left=!!st.l;f.input.right=!!st.r;const i=f.side,s=this.seen[i];
+   if(st.j!==s[0]){s[0]=st.j;f.input.jump=.14}if(st.a!==s[1]){s[1]=st.a;f.input.attack=.14}if(st.d!==s[2]){s[2]=st.d;f.input.dash=.14}if(st.h!==s[3]){s[3]=st.h|0;f.input.heavy=.14}if(st.st!==undefined&&st.st!==s[4]){s[4]=st.st|0;f.input.step=.12}},
  update(dt){
   if(this.paused){return}
   this.phaseT+=dt;
   let sd=dt;if(this.hitstop>0){this.hitstop-=dt;sd=0}else if(this.slow>0){this.slow-=dt;sd=dt*.3}
-  const mine={l:Input.left,r:Input.right,j:Input.j,a:Input.a,d:Input.d,h:Input.h};
+  const mine={l:Input.left,r:Input.right,j:Input.j,a:Input.a,d:Input.d,h:Input.h,st:Input.step};
   if(this.mode==='guest'){
-   this.inT+=dt;const sig=''+mine.l+mine.r+mine.j+mine.a+mine.d+mine.h;if(sig!==this.lastIn||this.inT>.1){this.lastIn=sig;this.inT=0;Net.send({t:'in',l:+mine.l,r:+mine.r,j:mine.j,a:mine.a,d:mine.d,h:mine.h})}
+   this.inT+=dt;const sig=''+mine.l+mine.r+mine.j+mine.a+mine.d+mine.h;if(sig!==this.lastIn||this.inT>.1){this.lastIn=sig;this.inT=0;Net.send({t:'in',l:+mine.l,r:+mine.r,j:mine.j,a:mine.a,d:mine.d,h:mine.h,st:mine.st})}
    if(sd>0){for(const f of[this.p1,this.p2]){f.guestTick(sd);f.animate(sd);f.pushTrail(sd)}}
   }else{
    this.feed(this.p1,mine);if(this.mode==='host')this.feed(this.p2,this.remote);
@@ -267,7 +274,7 @@ document.querySelectorAll('[data-home]').forEach(b=>b.onclick=()=>show('home'));
 $('resultHome').onclick=()=>{if(Match.mode!=='bot'){Net.send({t:'quit'});Net.close()}show('home')};
 $('rematchBtn').onclick=()=>{if(Match.mode==='bot'){startBot();return}
  const f=Match.rematchFlags;f.me=true;Net.send({t:'rematch'});$('rematchBtn').textContent='WAITING FOR OPPONENT…';tryRematch()};
-function tryRematch(){const f=Match.rematchFlags;if(Match.mode==='host'&&f&&f.me&&f.opp){Match.rematchFlags={me:false,opp:false};const seed=(Math.random()*1e9)|0;Net.send({t:'start',names:Match.names,seed});Match.start({mode:'host',names:Match.names,seed})}}
+function tryRematch(){const f=Match.rematchFlags;if(Match.mode==='host'&&f&&f.me&&f.opp){Match.rematchFlags={me:false,opp:false};const seed=(Math.random()*1e9)|0,matchId=((crypto&&crypto.randomUUID)?crypto.randomUUID():'m_'+Date.now());Net.send({t:'start',names:Match.names,seed,matchId});Match.start({mode:'host',names:Match.names,seed,matchId})}}
 $('pauseBtn').onclick=()=>{SFX.ui();Match.pause(true)};
 $('resumeBtn').onclick=()=>Match.pause(false);
 $('quitDuel').onclick=()=>Match.quit();
@@ -275,17 +282,17 @@ $('fsBtn').onclick=()=>{const d=document.documentElement;try{(d.requestFullscree
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&Match.active&&Match.mode==='bot'&&!Match.paused)Match.pause(true)});
 
 /* ---- sound / graphics settings ---- */
-function setSound(on){state.muted=!on;SFX.muted=state.muted;if(on){SFX.init();SFX.resume();SFX.ui()}save();updateHome();updateSettings()}
+function setSound(on){state.muted=!on;SFX.muted=state.muted;if(on){SFX.init();SFX.resume();SFX.ui()}save();if(DF.Progression)DF.Progression.setSettings({sound:!state.muted,gfx:state.gfx}).catch(()=>{});updateHome();updateSettings()}
 $('muteBtn').onclick=()=>setSound(state.muted);$('setSound').onclick=()=>setSound(state.muted);
 function updateSettings(){$('setSound').setAttribute('aria-checked',String(!state.muted));document.querySelectorAll('#setGfx button').forEach(b=>b.classList.toggle('on',b.dataset.g===state.gfx));$('setName').textContent=state.player.name}
-$('setGfx').onclick=e=>{const g=e.target.dataset&&e.target.dataset.g;if(!g)return;state.gfx=g;autoLow=false;qual=baseQual();applyGfx();save();updateSettings()};
+$('setGfx').onclick=e=>{const g=e.target.dataset&&e.target.dataset.g;if(!g)return;state.gfx=g;autoLow=false;qual=baseQual();applyGfx();save();if(DF.Progression)DF.Progression.setSettings({sound:!state.muted,gfx:state.gfx}).catch(()=>{});updateSettings()};
 $('setRename').onclick=()=>openName(true);
 
 /* ---- gamertag ---- */
 const TAG1=['ASH','GRIM','IRON','EMBER','DUSK','RAVEN','BLACK','THORN','CRYPT','BLOOD'],TAG2=['KNIGHT','WARDEN','BLADE','REAVER','MARSHAL','SLAYER','WOLF','LORD'];
 const cleanName=s=>String(s||'').replace(/[^\w\- ]/g,'').replace(/\s+/g,' ').trim().slice(0,14).toUpperCase();
 function openName(canCancel){$('nameIn').value=state.player.name;$('nameErr').textContent='';$('nameCancel').hidden=!canCancel;show('nameScreen');setTimeout(()=>{try{$('nameIn').focus()}catch(e){}},60)}
-function submitName(){const n=cleanName($('nameIn').value);if(n.length<2){$('nameErr').textContent='Use at least 2 letters or numbers.';return}state.player.name=n;save();show('home')}
+async function submitName(){const n=cleanName($('nameIn').value);if(n.length<2){$('nameErr').textContent='Use at least 2 letters or numbers.';return}state.player.name=n;save();try{if(DF.Progression)await DF.Progression.setName(n)}catch(e){$('nameErr').textContent=e.message||'Could not save name.';return}show('home')}
 $('nameOk').onclick=submitName;$('nameCancel').onclick=()=>show('home');$('namePill').onclick=()=>openName(true);
 $('nameIn').onkeydown=e=>{if(e.key==='Enter')submitName()};$('nameIn').oninput=()=>{$('nameErr').textContent=''};
 $('diceBtn').onclick=()=>{$('nameIn').value=(pick(TAG1)+pick(TAG2)+(10+((Math.random()*90)|0))).slice(0,14);$('nameErr').textContent=''};
@@ -381,7 +388,7 @@ function showRoom(code,host){[...$('roomCode').children].forEach((el,k)=>el.text
  show('room')}
 function wireNet(){
  Net.onjoining=()=>{if(cur==='room')roomMsg('Opponent is joining',true)};
- Net.onopen=()=>{busy(false);Net.send({t:'hello',name:state.player.name});if(Net.role==='guest')showRoom(Net.code,false)};
+ Net.onopen=()=>{busy(false);Net.send({t:'hello',name:state.player.name,mods:DF.Progression?DF.Progression.combat():{}});if(Net.role==='guest')showRoom(Net.code,false)};
  Net.onclose=()=>{
   if(Match.active&&Match.mode!=='bot'){banner('OPPONENT LEFT','','end');setTimeout(()=>{Match.active=false;Net.close();show('home')},1800)}
   else if(cur==='room')leftRoom();
@@ -406,12 +413,12 @@ $('shareCode').onclick=async()=>{if(navigator.share){try{await navigator.share({
 
 function onNet(m){
  switch(m.t){
-  case'hello':remoteName=String(m.name||'OPPONENT').slice(0,14);
+  case'hello':remoteName=String(m.name||'OPPONENT').slice(0,14);if(m.mods)Match.p2.mods=m.mods;
    if(Net.role==='host'){setSlot(2,remoteName,'GUEST',true);roomMsg('Opponent joined! Starting…',false);clearTimeout(roomT);
     roomT=setTimeout(()=>{if(!Net.open||cur!=='room')return;const seed=(Math.random()*1e9)|0,names=[state.player.name,remoteName];Net.send({t:'start',names,seed});Match.start({mode:'host',names,seed})},1800)}
    else{setSlot(1,remoteName,'HOST',true);roomMsg('Joined! The match starts in a moment',true)}break;
-  case'start':clearTimeout(roomT);Match.start({mode:'guest',names:m.names,seed:m.seed});break;
-  case'in':if(Match.mode==='host')Match.remote={l:m.l,r:m.r,j:m.j,a:m.a,d:m.d,h:m.h|0};break;
+  case'start':clearTimeout(roomT);Match.start({mode:'guest',names:m.names,seed:m.seed,matchId:m.matchId});break;
+  case'in':if(Match.mode==='host')Match.remote={l:m.l,r:m.r,j:m.j,a:m.a,d:m.d,h:m.h|0,st:m.st|0};break;
   case'pstart':if(Match.mode==='guest'&&Match.active){Match.round=m.n;Match.score=m.sc;Match.picks=[null,null];Match.enterPick()}break;
   case'pick':if(Match.mode==='host'&&m.n===Match.round)Match.setRemotePick(m.w);break;
   case'lock':if(Match.mode==='guest'&&Match.phase==='pick')Picker.setOpp(true);break;
@@ -419,11 +426,12 @@ function onNet(m){
   case'ph':if(Match.mode!=='guest')break;if(m.ph==='fight')Match.startFight();else if(m.ph==='ko'){Match.score=m.sc;Match.round=m.r;Match.slow=m.ko?.9:0;Match.phase='fight';Match.showRoundEnd(m.w,!!m.ko)}break;
   case's':if(Match.mode==='guest'&&Match.active){Match.p1.applySnap(m.a,Match);Match.p2.applySnap(m.b,Match);Match.timeLeft=m.tm}break;
   case'hit':if(Match.mode==='guest'&&Match.active)Match.fxHit(m.s,m.x,m.y,m.g||(m.s?Match.p2:Match.p1).weapon.dmg,!!m.k,m.d,!!m.v);break;
+   case'power':if(Match.mode==='guest'&&Match.active){FX.ring(m.x,m.y,Match.p2.pal.accent,70,.3);FX.sparks(m.x,m.y,Match.p2.facing,10,Match.p2.pal.accent,380);SFX.dash();}break;
   case'rematch':if(Match.rematchFlags){Match.rematchFlags.opp=true;tryRematch()}break;
   case'quit':if(Match.active&&Match.mode!=='bot'){banner('OPPONENT LEFT','','end');setTimeout(()=>{Match.active=false;Net.close();show('home')},1800)}
    else if(cur==='room')leftRoom();else if(cur==='result'){$('rematchBtn').disabled=true;$('rematchBtn').textContent='OPPONENT LEFT'}break;
  }}
 
-applyGfx();updateHome();
+syncCloud();applyGfx();updateHome();
 DF.Match=Match;DF.step=dt=>{Match.update(dt);render()};
 })();
