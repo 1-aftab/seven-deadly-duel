@@ -23,8 +23,9 @@ function ik(sx,sy,tx,ty,a,b,out){let dx=tx-sx,dy=ty-sy,d=Math.hypot(dx,dy);const
  const A=Math.acos(clamp((a*a+d*d-b*b)/(2*a*d),-1,1));out.ex=sx+Math.cos(ang+A)*a;out.ey=sy+Math.sin(ang+A)*a;out.hx=sx+Math.cos(ang)*d;out.hy=sy+Math.sin(ang)*d}
 
 class Fighter{
- constructor(side,name){this.side=side;this.name=name;this.pal=PAL[side];this.pose=mk();this.tgt=mk();this.rig={};this.ik={};
+ constructor(side,name){this.side=side;this.name=name;this.characterId=(DF.Characters&&DF.Characters.list[side?1:0]||DF.Characters?.get?.('shadow'))?.id||'shadow';this.pal=PAL[side];this.pose=mk();this.tgt=mk();this.rig={};this.ik={};
   this.input={left:false,right:false,jump:0,attack:0,dash:0,heavy:0,step:0};this.stepSeen=0;this.atkCd=0;this.hvCd=0;this.trail=[];this.ghosts=[];this.cape={x:-26,y:46};this.weapon=DF.WEAPONS.sword;this.reset(300,1,this.weapon)}
+ setCharacter(id){if(DF.Characters&&DF.Characters.valid(id))this.characterId=id;return this.characterId}
  reset(x,face,weapon){this.x=x;this.y=GROUND;this.vx=0;this.vy=0;this.facing=face;this.grounded=true;this.hp=100;this.mode='intro';this.modeT=0;this.atk=null;this.prevSeg=null;
   this.dashCd=0;this.atkCd=0;this.hvCd=3.5;this.powerCd=0;this.powerT=0;this.powerKind='';this.inv=0;this.flash=0;this.landT=0;this.walkPh=0;this.animT=Math.random()*5;this.rot=0;this.yOff=0;this.shakeT=0;this.hipY=-56;this.hurtDur=.3;this.dashDir=1;this.ghostT=0;
   this.trail.length=0;this.ghosts.length=0;this.weapon=weapon;this.input.left=this.input.right=false;this.input.jump=this.input.attack=this.input.dash=this.input.heavy=0;this.input.step=0;this.stepSeen=0;
@@ -152,20 +153,45 @@ startPower(G,pow){this.input.heavy=0;const st=pow.stats||{},type=st.type||'';thi
  drawShadow(c){const h=clamp((GROUND-this.y)/160,0,1),rx=34*(1-h*.4),a=.5*(1-h*.6);if(this.mode==='ko'&&this.modeT>.2){}
   c.globalAlpha=a;c.fillStyle='#000';c.beginPath();c.ellipse(this.x,GROUND+5,rx,7*(1-h*.3),0,0,6.283);c.fill();
   c.globalCompositeOperation='lighter';c.globalAlpha=.12*(1-h);c.fillStyle=this.pal.accent;c.beginPath();c.ellipse(this.x,GROUND+5,rx*1.1,6,0,0,6.283);c.fill();c.globalCompositeOperation='source-over';c.globalAlpha=1}
- drawGhosts(c){for(const g of this.ghosts){c.globalAlpha=Math.max(0,g.a)*.45;c.fillStyle=this.pal.accent;c.save();c.translate(g.x,g.y);c.scale(g.f,1);
-   c.beginPath();c.ellipse(4,-70,12,30,.25,0,6.283);c.fill();c.beginPath();c.arc(10,-110,10,0,6.283);c.fill();c.restore()}c.globalAlpha=1}
+ drawGhosts(c){const ch=DF.Characters&&DF.Characters.get?DF.Characters.get(this.characterId):null;const im=ch&&DF.Characters.images[this.characterId];if(!im||!im.complete)return;for(const g of this.ghosts){c.save();c.translate(g.x,g.y);c.scale(g.f*.42,.42);c.globalAlpha=Math.max(0,g.a)*.22;c.globalCompositeOperation='screen';c.drawImage(im,-42,-190,84,190);c.restore()}c.globalAlpha=1;c.globalCompositeOperation='source-over'}
  drawTrail(c){const T=this.trail;if(T.length<2)return;const w=this.weapon,N=4;c.globalCompositeOperation='lighter';c.lineJoin='round';const col=this.pal.accent,bx=[],by=[],tx=[],ty=[];
   for(let i=1;i<T.length;i++){const a=T[i-1],b=T[i],k=1-b.age/.17;if(k<=0)continue;let da=b.a-a.a;while(da>Math.PI)da-=6.2832;while(da<-Math.PI)da+=6.2832;
    for(let j=0;j<=N;j++){const u=j/N,an=a.a+da*u,gx=a.gx+(b.gx-a.gx)*u,gy=a.gy+(b.gy-a.gy)*u,cx=Math.cos(an),cy=Math.sin(an);bx[j]=gx+cx*w.seg0;by[j]=gy+cy*w.seg0;tx[j]=gx+cx*w.len;ty[j]=gy+cy*w.len}
    c.globalAlpha=k*.5;c.fillStyle=col;c.beginPath();c.moveTo(bx[0],by[0]);for(let j=1;j<=N;j++)c.lineTo(bx[j],by[j]);for(let j=N;j>=0;j--)c.lineTo(tx[j],ty[j]);c.closePath();c.fill();
    c.globalAlpha=k*.95;c.strokeStyle='#fff';c.lineWidth=2.4;c.beginPath();c.moveTo(tx[0],ty[0]);for(let j=1;j<=N;j++)c.lineTo(tx[j],ty[j]);c.stroke()}
   c.globalAlpha=1;c.globalCompositeOperation='source-over'}
+ drawAnime(c){
+  const ch=DF.Characters&&DF.Characters.get?DF.Characters.get(this.characterId):null;
+  const im=ch&&DF.Characters.images[this.characterId];
+  if(!ch||!im||!im.complete||!im.naturalWidth)return false;
+  const t=this.animT, m=this.mode;
+  let bob=Math.sin(t*2.4)*1.4, sx=1, sy=1, rot=0, ox=0, oy=0;
+  if(m==='free'&&Math.abs(this.vx)>14){bob=Math.sin(t*11)*2.2;sx=1+Math.sin(t*11)*.018;rot=Math.sin(t*11)*.025}
+  if(m==='attack'&&this.atk){const a=this.atk;const p=a.phase===0?clamp(a.t/a.W,0,1):a.phase===1?1:1-clamp(a.t/a.R,0,1);ox=this.facing*p*13;rot=this.facing*(a.phase===1?.045:-.02);sx=1+.035*p;sy=1-.025*p}
+  if(m==='hurt'){rot=-this.facing*.09;ox=-this.facing*5}
+  if(m==='dash'){ox=this.dashDir*10;sy=.97;sx=1.06}
+  if(!this.grounded&&m!=='ko'){oy=6;rot=this.facing*.035}
+  if(m==='ko'){rot=this.facing*.65;oy=30;sx=1.08;sy=.72}
+  if(m==='win'){bob=Math.sin(t*3)*3;sy=1.03}
+  const H=190,W=84;
+  c.save();c.translate(ox,oy+bob);c.rotate(rot);c.scale(this.facing*sx,sy);
+  c.globalAlpha=this.flash>0?.72:1;
+  // The source art has a dark presentation background; screen compositing lets the arena show through it.
+  c.globalCompositeOperation='screen';
+  c.drawImage(im,-W/2,-H,W,H);
+  c.globalCompositeOperation='source-over';c.globalAlpha=1;
+  // character-specific accent glow keeps the sprite readable on the dark arena
+  c.globalCompositeOperation='lighter';c.globalAlpha=.06; c.fillStyle=ch.color; c.beginPath();c.ellipse(0,-92,34,88,0,0,6.283);c.fill();
+  c.globalAlpha=1;c.globalCompositeOperation='source-over';c.restore();
+  return true;
+}
  draw(c){
   const R=this.rig,P=this.pose,pal=this.flash>0?PAL_FLASH:this.pal,w=this.weapon;
   const jx=this.shakeT>0?(Math.random()-.5)*5:0;
   c.save();c.translate(this.x+jx,this.y+this.yOff);c.scale(this.facing,1);
   if(this.rot){c.rotate(this.rot);c.translate(0,-7*Math.min(1,-this.rot))}
   c.lineCap='round';c.lineJoin='round';
+  if(this.drawAnime(c)){c.restore();return;}
   const chg=this.atk&&this.atk.heavy&&this.atk.phase===0;
   if(chg){const k=clamp(this.atk.t/this.atk.W,0,1);c.globalCompositeOperation='lighter';c.strokeStyle=this.pal.accent;c.fillStyle=this.pal.accent;
    c.globalAlpha=.12+.25*k;c.beginPath();c.arc(0,-62,34+14*k,0,6.283);c.fill();c.globalAlpha=.85*(1-k*.4);c.lineWidth=3;c.beginPath();c.arc(0,-62,82-48*k,0,6.283);c.stroke();
