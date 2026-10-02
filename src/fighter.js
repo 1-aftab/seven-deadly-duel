@@ -27,7 +27,7 @@ class Fighter{
   this.input={left:false,right:false,jump:0,attack:0,dash:0,heavy:0,step:0};this.stepSeen=0;this.atkCd=0;this.hvCd=0;this.trail=[];this.ghosts=[];this.cape={x:-26,y:46};this.weapon=DF.WEAPONS.sword;this.reset(300,1,this.weapon)}
  reset(x,face,weapon){this.x=x;this.y=GROUND;this.vx=0;this.vy=0;this.facing=face;this.grounded=true;this.hp=100;this.mode='intro';this.modeT=0;this.atk=null;this.prevSeg=null;
   this.dashCd=0;this.atkCd=0;this.hvCd=3.5;this.powerCd=0;this.powerT=0;this.powerKind='';this.inv=0;this.flash=0;this.landT=0;this.walkPh=0;this.animT=Math.random()*5;this.rot=0;this.yOff=0;this.shakeT=0;this.hipY=-56;this.hurtDur=.3;this.dashDir=1;this.ghostT=0;
-  this.trail.length=0;this.ghosts.length=0;this.weapon=weapon;this.input.left=this.input.right=false;this.input.jump=this.input.attack=this.input.dash=this.input.heavy=this.input.step=0;
+  this.trail.length=0;this.ghosts.length=0;this.weapon=weapon;this.input.left=this.input.right=false;this.input.jump=this.input.attack=this.input.dash=this.input.heavy=0;this.input.step=0;this.stepSeen=0;
   Object.assign(this.pose,DF.READY);this.rig={};this.computeRig(1)}
  setMode(m){this.mode=m;this.modeT=0}
  get alive(){return this.hp>0}
@@ -41,9 +41,11 @@ class Fighter{
   const m=this.mode;
   if(m==='free'){
    faceOpp();
+   if(I.step!==this.stepSeen){this.stepSeen=I.step;if(this.grounded&&this.dashCd<=0){this.dashCd=.85;this.dashDir=dir||this.facing;this.inv=.12;this.stepMode=true;this.setMode('dash');this.ghostT=0;G.onDash(this);return}}
    const tv=dir*spd,k=this.grounded?16:5;this.vx+=(tv-this.vx)*Math.min(1,k*dt);
    if(I.jump>0&&this.grounded){this.vy=-JUMP;this.grounded=false;I.jump=0;G.onJump(this)}
    if(I.dash>0&&this.dashCd<=0)this.startDash(dir||this.facing,G);
+   else if(I.heavy>0&&this.powerCd<=0&&pow)this.startPower(G,pow);
    else if(I.heavy>0&&this.hvCd<=0)this.startAttack(G,true);
    else if(I.attack>0&&this.atkCd<=0)this.startAttack(G,false);
   }else if(m==='attack'){
@@ -55,7 +57,8 @@ class Fighter{
      else if(I.jump>0&&this.grounded){this.atk=null;this.setMode('free')}}
     if(this.atk&&a.t>=a.R){this.atk=null;this.setMode('free')}}
   }else if(m==='dash'){
-   const step=this.stepMode;this.vx=this.dashDir*(step?DASHV*1.18:DASHV)*Math.max(0,1-this.modeT/(step?.22:.2))+this.dashDir*(step?110:80);this.ghostT-=dt;if(this.ghostT<=0){this.ghostT=.03;this.ghosts.push({x:this.x,y:this.y,f:this.facing,a:.5});if(this.ghosts.length>5)this.ghosts.shift()}
+   const step=this.stepMode;
+   if(step&&I.attack>0&&this.modeT>.045){this.input.attack=0;this.stepMode=false;this.setMode('free');this.startAttack(G,false);return}this.vx=this.dashDir*(step?DASHV*1.18:DASHV)*Math.max(0,1-this.modeT/(step?.22:.2))+this.dashDir*(step?110:80);this.ghostT-=dt;if(this.ghostT<=0){this.ghostT=.03;this.ghosts.push({x:this.x,y:this.y,f:this.facing,a:.5});if(this.ghosts.length>5)this.ghosts.shift()}
    if(this.modeT>=(this.stepMode?.22:.19)){this.stepMode=false;this.setMode('free')}
   }else if(m==='hurt'){
    this.vx*=Math.exp(-dt*(this.grounded?5.5:1.5));if(this.modeT>=this.hurtDur&&this.grounded)this.setMode('free');else if(this.modeT>=this.hurtDur+.5)this.setMode('free');
@@ -74,6 +77,7 @@ class Fighter{
   if(hv){this.hvCd=HVCD;this.atkCd=Math.max(this.atkCd,T.W+T.S+T.R+.2)}else this.atkCd=T.W+T.S+T.R+ATK_GAP;
   this.setMode('attack');this.prevSeg=null;G.onAttackStart&&G.onAttackStart(this)}
  startDash(d,G){this.input.dash=0;this.atk=null;this.dashDir=d;this.dashCd=.85;this.inv=.12;this.stepMode=false;this.setMode('dash');this.ghostT=0;G.onDash(this)}
+startPower(G,pow){this.input.heavy=0;const st=pow.stats||{},type=st.type||'';this.powerCd=st.cooldown||8;this.powerKind=type;this.powerT=st.duration||0;G.onPower&&G.onPower(this,type,st);if(type==='shadowstep'){const dir=this.facing;this.x=clamp(this.x+dir*(st.distance||115),56,904);this.inv=.18;this.setMode('dash');this.stepMode=true;this.modeT=0;this.dashDir=dir;this.ghostT=0;return}if(type==='lightning'){G.onPower&&G.onPower(this,type,st);this.powerT=.18;return}this.setMode('free')}
  hurt(dir,kb,up,dur){this.atk=null;this.setMode('hurt');this.hurtDur=dur;this.vx=dir*kb;if(up>0){this.vy=-up;this.grounded=false}this.flash=.1;this.shakeT=.12;this.inv=dur+.1}
  die(dir,kb){this.atk=null;this.setMode('ko');this.vx=dir*kb*1.1;this.vy=-300;this.grounded=false;this.flash=.14;this.shakeT=.2;this.inv=9}
  /* ---------- animation ---------- */

@@ -10,8 +10,7 @@ const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>'
 const KEY='duelforge.v3';
 const state={player:{name:'',mpWins:0,mpLosses:0,botWins:0,coins:500},muted:false,gfx:'auto',
  /* placeholder champions — a real shared board needs a server. Ranking = multiplayer duels only. */
- board:[{name:'SirMorrow',wins:42,losses:9},{name:'Blackthorn',wins:39,losses:14},{name:'Ravenmoor',wins:35,losses:12},
-  {name:'Aldric the Grim',wins:31,losses:17},{name:'Vexmar',wins:27,losses:19},{name:'Ashen Warden',wins:24,losses:21}]};
+ board:[]};
 try{let s=JSON.parse(localStorage.getItem(KEY)||'null');
  if(s){Object.assign(state.player,s.player||{});state.muted=!!s.muted;if(s.gfx==='low')state.gfx='low'}
  else{const o=JSON.parse(localStorage.getItem('duelforge.v2')||'null');if(o&&o.player){state.player.wins=o.player.wins|0;state.player.coins=o.player.coins|0||500}}}catch(e){}
@@ -23,17 +22,15 @@ SFX.muted=state.muted;
 DF.Progression&&(DF.Progression.onChange=()=>{syncCloud();updateHome();if(cur==='settings')updateSettings()});
 const ico=(n,c)=>'<svg class="i '+(c||'')+'" aria-hidden="true"><use href="#i-'+n+'"/></svg>';
 
-const screens=['splash','authScreen','nameScreen','home','mp','room','leaderboard','settings','store','profile','duel','result'];
+const screens=['splash','authScreen','nameScreen','home','mp','room','leaderboard','settings','store','profile','friends','duel','result'];
 let cur='splash';
 function show(id){cur=id;screens.forEach(s=>$(s).classList.toggle('active',s===id));document.body.classList.toggle('in-duel',id==='duel');
  if(id==='home')updateHome();if(id==='leaderboard')renderBoard();if(id==='settings')updateSettings();if(id!=='duel'){Match.active=false}window.scrollTo(0,0)}
 DF.show=show;
-const hasRank=()=>state.player.mpWins+state.player.mpLosses>0;
-const W=x=>x===state.player?x.mpWins:x.wins,Lo=x=>x===state.player?x.mpLosses:x.losses;
-function ranked(){const l=[...state.board];if(hasRank())l.push(state.player);return l.sort((a,b)=>W(b)-W(a)||Lo(a)-Lo(b)||(a===state.player?-1:b===state.player?1:0))}
-const myRank=()=>{const i=ranked().indexOf(state.player);return i<0?0:i+1};
-function updateHome(){const r=myRank();$('homeWins').textContent=state.player.mpWins;$('homeCoins').textContent=state.player.coins.toLocaleString();$('homeRank').textContent=r?'#'+r:'\u2014';
- $('playerName').textContent=state.player.name||'PLAYER';$('avatar').textContent=(state.player.name||'?')[0];$('muteBtn').innerHTML=ico(state.muted?'mute':'vol')}
+const W=x=>x.mp_wins|0,Lo=x=>x.mp_losses|0;
+function ranked(){const rows=[...state.board];const seen=new Set(),out=[];for(const x of rows){const key=x.id||String(x.name||'').toUpperCase();if(seen.has(key))continue;seen.add(key);out.push(x)}const meId=DF.Progression?.state?.profile?.id;if(meId&&!seen.has(meId))out.push({id:meId,name:state.player.name,mp_wins:state.player.mpWins,mp_losses:state.player.mpLosses});return out.sort((a,b)=>W(b)-W(a)||Lo(a)-Lo(b)||String(a.name||'').localeCompare(String(b.name||'')))}
+const myRank=()=>{const id=DF.Progression?.state?.profile?.id;const all=ranked();const i=id?all.findIndex(x=>x.id===id):all.findIndex(x=>String(x.name).toUpperCase()===String(state.player.name).toUpperCase());return i<0?0:i+1};
+function updateHome(){const r=myRank();$('homeWins').textContent=state.player.mpWins;$('homeCoins').textContent=state.player.coins.toLocaleString();$('homeRank').textContent=r?'#'+r:'—';$('playerName').textContent=state.player.name||'PLAYER';$('avatar').textContent=(state.player.name||'?')[0];$('muteBtn').innerHTML=ico(state.muted?'mute':'vol');if(DF.Progression?.ready?.()&&cur==='home')DF.Progression.leaderboard().then(rows=>{state.board=(rows||[]).map(x=>({id:x.id,name:x.display_name,mp_wins:x.mp_wins|0,mp_losses:x.mp_losses|0,rank:x.rank|0}));if(cur==='home')$('homeRank').textContent=myRank()?'#'+myRank():'—'}).catch(()=>{})}
 async function renderBoard(){
   const note=$('boardNote');
   try{
@@ -42,10 +39,10 @@ async function renderBoard(){
     const P=state.player;
     $('meCard').innerHTML=`<span class="big">${myRank()?'#'+myRank():'—'}</span><div><b>${escapeHtml(P.name||'PLAYER')}</b><small>${P.mpWins} WINS · ${P.mpLosses} LOSSES · MULTIPLAYER</small></div>`;
     const rows=DF.Progression?await DF.Progression.leaderboard():[];
-    state.board=(rows||[]).map(x=>({name:x.display_name,wins:x.mp_wins|0,losses:x.mp_losses|0,mp_wins:x.mp_wins|0,mp_losses:x.mp_losses|0,rank:x.rank|0}));
+    state.board=(rows||[]).map(x=>({id:x.id,name:x.display_name,mp_wins:x.mp_wins|0,mp_losses:x.mp_losses|0,rank:x.rank|0}));
     const all=ranked();
     $('board').innerHTML='<div class="row header"><span>#</span><span>FIGHTER</span><span>WINS</span><span>LOSSES</span></div>'+
-      (all.length?all.map((x,i)=>`<div class="row ${x===P?'me':''}"><span class="rk ${i<3?'r'+(i+1):''}">${i+1}</span><span class="nm"><span class="avatar">${escapeHtml((x.name||'?')[0])}</span><b>${escapeHtml(x.name||'PLAYER')}</b>${x===P?'<span class="tag-npc">YOU</span>':''}</span><b>${W(x)}</b><b>${Lo(x)}</b></div>`).join(''):'<div class="row"><span></span><span>No ranked players yet.</span><span>0</span><span>0</span></div>');
+      (all.length?all.map((x,i)=>{const me=x.id&&x.id===DF.Progression?.state?.profile?.id;return `<div class="row ${me?'me':''}"><span class="rk ${i<3?'r'+(i+1):''}">${i+1}</span><span class="nm"><span class="avatar">${escapeHtml((x.name||'?')[0])}</span><b>${escapeHtml(x.name||'PLAYER')}</b>${me?'<span class="tag-npc">YOU</span>':''}</span><b>${W(x)}</b><b>${Lo(x)}</b></div>`}).join(''):'<div class="row"><span></span><span>No ranked players yet.</span><span>0</span><span>0</span></div>');
     if(note)note.textContent='Live Supabase leaderboard · shared across registered accounts and devices.';
   }catch(e){
     console.warn('Leaderboard load failed:',e);
@@ -58,7 +55,7 @@ async function renderBoard(){
 /* ================= input ================= */
 const Input={left:false,right:false,j:0,a:0,d:0,h:0,
  dir(l,r){this.left=l;this.right=r;$('leftBtn').classList.toggle('on',l);$('rightBtn').classList.toggle('on',r)},
- press(k){this[k]++;SFX.init();SFX.resume()},clear(){this.dir(false,false)}};
+ press(k){this[k]++;SFX.init();SFX.resume()},tapDir(k){const now=performance.now(),key='tap_'+k,last=this[key]||0;this[key]=now;if(now-last<260){this.step++;SFX.ui()}},clear(){this.dir(false,false)}};
 const KEYMAP={a:'L',arrowleft:'L',d:'R',arrowright:'R',w:'J',arrowup:'J',' ':'J',j:'A',k:'H',u:'H',l:'D',shift:'D'};
 const held={L:false,R:false};
 addEventListener('keydown',e=>{if(!Match.active)return;const k=KEYMAP[e.key.toLowerCase()];if(!k)return;e.preventDefault();
@@ -201,6 +198,17 @@ const Match={
  /* ---- gameplay callbacks (called by Fighter) ---- */
  onJump(f){FX.dust(f.x,412,4);SFX.jump()},onLand(f){FX.dust(f.x,412,5)},onDash(f){FX.dust(f.x,412,6,-f.dashDir);SFX.dash()},
  onAttackStart(f){if(f.atk&&f.atk.heavy)SFX.charge()},
+onPower(f,type,st){
+  if(this.mode==='host')Net.send({t:'power',s:f.side,x:Math.round(f.x),y:Math.round(f.y-70),type});
+  FX.ring(f.x,f.y-70,f.pal.accent,type==='lightning'?110:70,.35);FX.sparks(f.x,f.y-65,f.facing,12,f.pal.accent,420);SFX.dash();FX.shake(type==='lightning'?3:1.5);
+  if(type==='lightning'){
+    const def=f===this.p1?this.p2:this.p1,range=st.range||180,dist=Math.abs(def.x-f.x);
+    if(dist<=range&&def.mode!=='ko'){
+      const defense=(def.mods?.armor?.stats?.defense||0)+(def.powerKind==='shield'&&def.powerT>0?(def.mods?.power?.stats?.defense||.35):0);
+      const dmg=Math.max(1,Math.round((st.damage||26)*(1-Math.min(.45,defense))));def.hp=Math.max(0,def.hp-dmg);const dir=def.x>=f.x?1:-1,ko=def.hp<=0;if(ko)def.die(dir,80);else def.hurt(dir,80,60,.24);this.fxHit(f.side,def.x,def.y-70,dmg,ko,dir,true);if(this.mode==='host')Net.send({t:'powerHit',s:f.side,x:Math.round(def.x),y:Math.round(def.y-70),d:dmg,k:ko?1:0,dir});
+    }
+  }
+},
  onSwing(f){const hv=f.atk&&f.atk.heavy;SFX.swing(f.weapon.dmg>=20||hv);if(hv){SFX.heavy();FX.shake(3);FX.ring(f.x+f.facing*40,f.y-60,f.pal.accent,70,.3)}},
  onSwingEnd(f){if(f.weapon.id==='hammer'||f.weapon.id==='greatblade'){const s=f.seg({});if(s.ty>380){FX.dust(s.tx,412,7);FX.ring(s.tx,410,'#e8d9b5',46,.3);FX.shake(f.weapon.id==='hammer'?3.5:2.5)}}},
  hud(){setPips('hero',this.score[0]);setPips('enemy',this.score[1]);$('myRounds').textContent=this.score[0];$('botRounds').textContent=this.score[1]},
@@ -243,7 +251,7 @@ const Match={
   let sd=dt;if(this.hitstop>0){this.hitstop-=dt;sd=0}else if(this.slow>0){this.slow-=dt;sd=dt*.3}
   const mine={l:Input.left,r:Input.right,j:Input.j,a:Input.a,d:Input.d,h:Input.h,st:Input.step};
   if(this.mode==='guest'){
-   this.inT+=dt;const sig=''+mine.l+mine.r+mine.j+mine.a+mine.d+mine.h;if(sig!==this.lastIn||this.inT>.1){this.lastIn=sig;this.inT=0;Net.send({t:'in',l:+mine.l,r:+mine.r,j:mine.j,a:mine.a,d:mine.d,h:mine.h,st:mine.st})}
+   this.inT+=dt;const sig=''+mine.l+mine.r+mine.j+mine.a+mine.d+mine.h+mine.st;if(sig!==this.lastIn||this.inT>.1){this.lastIn=sig;this.inT=0;Net.send({t:'in',l:+mine.l,r:+mine.r,j:mine.j,a:mine.a,d:mine.d,h:mine.h,st:mine.st})}
    if(sd>0){for(const f of[this.p1,this.p2]){f.guestTick(sd);f.animate(sd);f.pushTrail(sd)}}
   }else{
    this.feed(this.p1,mine);if(this.mode==='host')this.feed(this.p2,this.remote);
@@ -428,6 +436,8 @@ const flashBtn=(id,label,icon,txt)=>{const b=$(id);b.innerHTML=ico(icon)+' '+txt
 $('copyCode').onclick=async()=>{try{await navigator.clipboard.writeText(Net.code)}catch(e){}flashBtn('copyCode','COPY','copy','COPIED')};
 $('shareCode').onclick=async()=>{if(navigator.share){try{await navigator.share({title:'DuelForge',text:codeText()})}catch(e){}}else{try{await navigator.clipboard.writeText(codeText())}catch(e){}flashBtn('shareCode','SHARE','share','COPIED')}};
 
+DF.hostRoomForFriend=async friendId=>{if(!DF.Net?.supported())throw Error('Online play is not supported in this browser.');wireNet();busy(true);const code=await Net.host();await DF.Progression.createDuelRequest?.(friendId,code);busy(false);showRoom(code,true);show('room');return code};
+DF.joinRoomFromFriend=async code=>{if(!DF.Net?.supported())throw Error('Online play is not supported in this browser.');wireNet();busy(true);await Net.join(String(code));busy(false);showRoom(String(code),false);show('room')};
 function onNet(m){
  switch(m.t){
   case'hello':remoteName=String(m.name||'OPPONENT').slice(0,14);if(m.mods)Match.p2.mods=m.mods;
@@ -443,7 +453,8 @@ function onNet(m){
   case'ph':if(Match.mode!=='guest')break;if(m.ph==='fight')Match.startFight();else if(m.ph==='ko'){Match.score=m.sc;Match.round=m.r;Match.slow=m.ko?.9:0;Match.phase='fight';Match.showRoundEnd(m.w,!!m.ko)}break;
   case's':if(Match.mode==='guest'&&Match.active){Match.p1.applySnap(m.a,Match);Match.p2.applySnap(m.b,Match);Match.timeLeft=m.tm}break;
   case'hit':if(Match.mode==='guest'&&Match.active)Match.fxHit(m.s,m.x,m.y,m.g||(m.s?Match.p2:Match.p1).weapon.dmg,!!m.k,m.d,!!m.v);break;
-   case'power':if(Match.mode==='guest'&&Match.active){FX.ring(m.x,m.y,Match.p2.pal.accent,70,.3);FX.sparks(m.x,m.y,Match.p2.facing,10,Match.p2.pal.accent,380);SFX.dash();}break;
+   case'power':if(Match.mode==='guest'&&Match.active){const pf=m.s===0?Match.p1:Match.p2;FX.ring(m.x,m.y,pf.pal.accent,m.type==='lightning'?110:70,.35);FX.sparks(m.x,m.y,pf.facing,12,pf.pal.accent,420);SFX.dash();}break;
+  case'powerHit':if(Match.mode==='guest'&&Match.active){const df=m.s===0?Match.p2:Match.p1;df.hp=Math.max(0,df.hp-(m.d|0));if(m.k)df.die(m.dir||1,80);else df.hurt(m.dir||1,80,60,.24);Match.fxHit(m.s,m.x,m.y,m.d|0,!!m.k,m.dir||1,true);}break;
   case'rematch':if(Match.rematchFlags){Match.rematchFlags.opp=true;tryRematch()}break;
   case'quit':if(Match.active&&Match.mode!=='bot'){banner('OPPONENT LEFT','','end');setTimeout(()=>{Match.active=false;Net.close();show('home')},1800)}
    else if(cur==='room')leftRoom();else if(cur==='result'){$('rematchBtn').disabled=true;$('rematchBtn').textContent='OPPONENT LEFT'}break;
