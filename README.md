@@ -61,3 +61,6 @@ Room setup now waits for a connection handshake (`hello` → `room_ready` → `s
 ### GitHub Pages
 
 No build step or server runtime was introduced. Keep the project as a static site and publish the repository root with GitHub Pages.
+
+## V2 migration
+After deploying this build, run `SUPABASE_DUELFORGE_V2.sql` once in the Supabase SQL Editor. It adds profile bio/showcase weapon data, fixes leaderboard identity handling, and adds friends + duel requests. The original `SUPABASE_DUELFORGE.sql` should not be rerun just for this migration.
