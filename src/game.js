@@ -8,12 +8,15 @@ const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>'
 
 /* ================= profile / leaderboard (kept from MVP, now persisted) ================= */
 const KEY='duelforge.v3';
-const state={player:{name:'',wins:0,coins:500},muted:false,gfx:'auto',
- board:[{name:'ShadowKnight',wins:42,coins:18450},{name:'DarkBlade',wins:39,coins:19870},{name:'PixelWarrior',wins:35,coins:16420},
-  {name:'KnightX',wins:31,coins:14900},{name:'VoidWalker',wins:27,coins:13100},{name:'IronWraith',wins:24,coins:11020}]};
+const state={player:{name:'',mpWins:0,mpLosses:0,botWins:0,coins:500},muted:false,gfx:'auto',
+ /* placeholder champions — a real shared board needs a server. Ranking = multiplayer duels only. */
+ board:[{name:'SirMorrow',wins:42,losses:9},{name:'Blackthorn',wins:39,losses:14},{name:'Ravenmoor',wins:35,losses:12},
+  {name:'Aldric the Grim',wins:31,losses:17},{name:'Vexmar',wins:27,losses:19},{name:'Ashen Warden',wins:24,losses:21}]};
 try{let s=JSON.parse(localStorage.getItem(KEY)||'null');
  if(s){Object.assign(state.player,s.player||{});state.muted=!!s.muted;if(s.gfx==='low')state.gfx='low'}
  else{const o=JSON.parse(localStorage.getItem('duelforge.v2')||'null');if(o&&o.player){state.player.wins=o.player.wins|0;state.player.coins=o.player.coins|0||500}}}catch(e){}
+/* migrate: older versions counted every win (incl. bots) as 'wins' — those are practice wins now and never ranked */
+{const P=state.player;if(P.wins!=null){P.botWins=(P.botWins|0)+(P.wins|0);delete P.wins}P.mpWins|=0;P.mpLosses|=0;P.botWins|=0}
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify({player:state.player,muted:state.muted,gfx:state.gfx}))}catch(e){}};
 SFX.muted=state.muted;
 const ico=(n,c)=>'<svg class="i '+(c||'')+'" aria-hidden="true"><use href="#i-'+n+'"/></svg>';
@@ -22,13 +25,17 @@ const screens=['splash','nameScreen','home','mp','room','leaderboard','settings'
 let cur='splash';
 function show(id){cur=id;screens.forEach(s=>$(s).classList.toggle('active',s===id));document.body.classList.toggle('in-duel',id==='duel');
  if(id==='home')updateHome();if(id==='leaderboard')renderBoard();if(id==='settings')updateSettings();if(id!=='duel'){Match.active=false}window.scrollTo(0,0)}
-function ranked(){return[...state.board,state.player].sort((a,b)=>b.wins-a.wins||b.coins-a.coins)}
-function updateHome(){const r=ranked().indexOf(state.player)+1;$('homeWins').textContent=state.player.wins;$('homeCoins').textContent=state.player.coins.toLocaleString();$('homeRank').textContent='#'+r;
+const hasRank=()=>state.player.mpWins+state.player.mpLosses>0;
+const W=x=>x===state.player?x.mpWins:x.wins,Lo=x=>x===state.player?x.mpLosses:x.losses;
+function ranked(){const l=[...state.board];if(hasRank())l.push(state.player);return l.sort((a,b)=>W(b)-W(a)||Lo(a)-Lo(b)||(a===state.player?-1:b===state.player?1:0))}
+const myRank=()=>{const i=ranked().indexOf(state.player);return i<0?0:i+1};
+function updateHome(){const r=myRank();$('homeWins').textContent=state.player.mpWins;$('homeCoins').textContent=state.player.coins.toLocaleString();$('homeRank').textContent=r?'#'+r:'\u2014';
  $('playerName').textContent=state.player.name||'PLAYER';$('avatar').textContent=(state.player.name||'?')[0];$('muteBtn').innerHTML=ico(state.muted?'mute':'vol')}
-function renderBoard(){const all=ranked(),r=all.indexOf(state.player)+1;
- $('meCard').innerHTML=`<span class="big">#${r}</span><div><b>${escapeHtml(state.player.name)}</b><small>${state.player.wins} WINS &middot; ${state.player.coins.toLocaleString()} COINS</small></div>`;
- $('board').innerHTML='<div class="row header"><span>#</span><span>FIGHTER</span><span>WINS</span><span>COINS</span></div>'+
- all.map((x,i)=>`<div class="row ${x===state.player?'me':''}"><span class="rk ${i<3?'r'+(i+1):''}">${i+1}</span><span class="nm"><span class="avatar">${escapeHtml(x.name[0]||'?')}</span><b>${escapeHtml(x.name)}</b></span><b>${x.wins}</b><b class="coins">${x.coins.toLocaleString()}</b></div>`).join('')}
+function renderBoard(){const all=ranked(),r=myRank(),P=state.player;
+ $('meCard').innerHTML=r?`<span class="big">#${r}</span><div><b>${escapeHtml(P.name)}</b><small>${P.mpWins} WINS &middot; ${P.mpLosses} LOSSES &middot; MULTIPLAYER</small></div>`
+  :`<span class="big">&mdash;</span><div><b>${escapeHtml(P.name)}</b><small>UNRANKED &middot; FINISH A MULTIPLAYER DUEL TO ENTER THE BOARD</small></div>`;
+ $('board').innerHTML='<div class="row header"><span>#</span><span>FIGHTER</span><span>WINS</span><span>LOSSES</span></div>'+
+ all.map((x,i)=>`<div class="row ${x===P?'me':''}"><span class="rk ${i<3?'r'+(i+1):''}">${i+1}</span><span class="nm"><span class="avatar">${escapeHtml(x.name[0]||'?')}</span><b>${escapeHtml(x.name)}</b>${x===P?'<span class="tag-npc">YOU</span>':''}</span><b>${W(x)}</b><b>${Lo(x)}</b></div>`).join('')}
 
 /* ================= input ================= */
 const Input={left:false,right:false,j:0,a:0,d:0,h:0,
@@ -49,7 +56,7 @@ addEventListener('blur',()=>{held.L=held.R=false;Input.clear()});
  [['attackBtn','a'],['heavyBtn','h'],['jumpBtn','j'],['dashBtn','d']].forEach(([id,k])=>{const b=$(id);
   b.addEventListener('pointerdown',e=>{e.preventDefault();b.classList.add('down');Input.press(k)});
   const off=()=>b.classList.remove('down');b.addEventListener('pointerup',off);b.addEventListener('pointercancel',off);b.addEventListener('pointerleave',off)});
- const duel=$('duel');duel.addEventListener('touchmove',e=>e.preventDefault(),{passive:false});duel.addEventListener('touchstart',e=>{if(!e.target.closest('#pauseMenu'))e.preventDefault()},{passive:false});
+ const duel=$('duel');duel.addEventListener('touchmove',e=>e.preventDefault(),{passive:false});duel.addEventListener('touchstart',e=>{if(!e.target.closest('#pauseMenu,#picker'))e.preventDefault()},{passive:false});
  duel.addEventListener('contextmenu',e=>e.preventDefault());document.addEventListener('gesturestart',e=>e.preventDefault());
  const coarse=matchMedia('(pointer:coarse)').matches||navigator.maxTouchPoints>0||'ontouchstart' in window;document.body.classList.toggle('touch',coarse);
 })();
@@ -97,22 +104,62 @@ function weaponCard(who,w,cls){const s=w.stats,bar=(l,v)=>`<div class="st"><labe
  return`<div class="wcard ${cls}"><small>${escapeHtml(who)}</small><b>${w.name}</b>${bar('DMG',s.dmg)}${bar('SPD',s.spd)}${bar('RNG',s.rng)}</div>`}
 function flashScreen(){const f=$('hitFlash');f.classList.remove('go');void f.offsetWidth;f.classList.add('go')}
 
+
+/* ================= weapon picker: every round, both fighters choose their arms ================= */
+const PICK_TIME=12;
+const Picker={built:false,on:false,sel:null,locked:false,opp:false,tShown:-1,
+ build(){if(this.built)return;this.built=true;const g=$('pkGrid');
+  WEAPON_ORDER.forEach((id,n)=>{const w=WEAPONS[id],st=w.stats,b=document.createElement('button');b.type='button';b.className='pk-card';b.dataset.w=id;
+   const cv=document.createElement('canvas');cv.width=220;cv.height=100;const c=cv.getContext('2d'),k=200/(w.len+34);c.translate(10+22*k,50);c.scale(k,k);DF.drawWeapon(c,id,'#f0d28a',0);
+   const bar=(l,v)=>`<div class="st"><label>${l}</label><span><i style="--v:${v.toFixed(2)}"></i></span></div>`;
+   b.appendChild(cv);b.insertAdjacentHTML('beforeend',`<b><i class="pk-key">${n+1}</i>${w.name}</b>${bar('DMG',st.dmg)}${bar('SPD',st.spd)}${bar('RNG',st.rng)}`);
+   b.onclick=()=>this.select(id);g.appendChild(b)});
+  $('pkLock').onclick=()=>this.lock()},
+ show(round,foe){this.build();this.on=true;this.sel=null;this.locked=false;this.opp=false;this.tShown=-1;
+  $('picker').hidden=false;$('picker').classList.remove('locked');$('pkSub').textContent='ROUND '+round+' \u00b7 vs '+foe;
+  $('pkLock').disabled=true;$('pkLock').textContent='LOCK IN';
+  [...$('pkGrid').children].forEach(c=>c.classList.remove('sel'));this.status()},
+ hide(){this.on=false;$('picker').hidden=true},
+ select(id){if(!this.on||this.locked)return;this.sel=id;[...$('pkGrid').children].forEach(c=>c.classList.toggle('sel',c.dataset.w===id));$('pkLock').disabled=false;SFX.init();SFX.ui()},
+ lock(){if(!this.on||this.locked||!this.sel)return;this.locked=true;$('picker').classList.add('locked');$('pkLock').disabled=true;$('pkLock').textContent='LOCKED IN';this.status();Match.onMyPick(this.sel)},
+ autoLock(){if(!this.on||this.locked)return;if(!this.sel)this.select(WEAPON_ORDER[(Math.random()*WEAPON_ORDER.length)|0]);this.lock()},
+ setOpp(v){this.opp=v;this.status()},
+ status(){const e=$('pkStatus');e.className=this.opp?'ok':'';e.textContent=this.locked?(this.opp?'BOTH LOCKED IN':'WAITING FOR OPPONENT\u2026'):(this.opp?'OPPONENT LOCKED IN \u2014 YOUR MOVE':'OPPONENT IS CHOOSING\u2026')},
+ tick(t){const s=Math.max(0,Math.ceil(t));if(s===this.tShown)return;this.tShown=s;const e=$('pkTimer');e.textContent=s;e.classList.toggle('low',s<=3)}
+};
+addEventListener('keydown',e=>{if(!Picker.on||!Match.active||Match.paused)return;const n=parseInt(e.key,10);
+ if(n>=1&&n<=WEAPON_ORDER.length){Picker.select(WEAPON_ORDER[n-1]);e.preventDefault()}else if(e.key==='Enter'){Picker.lock();e.preventDefault()}},true);
+
 /* ================= match ================= */
 const Match={
- active:false,mode:'bot',me:0,phase:'none',phaseT:0,round:1,score:[0,0],rand:null,prevW:[null,null],names:['AFTAB','IRON WRAITH'],
+ active:false,mode:'bot',me:0,phase:'none',phaseT:0,round:1,score:[0,0],rand:null,picks:[null,null],pickT:0,botWait:0,names:['AFTAB','ASHEN WARDEN'],
  p1:new DF.Fighter(0,'P1'),p2:new DF.Fighter(1,'P2'),bot:null,timeLeft:60,hitstop:0,slow:0,paused:false,netT:0,inT:0,lastIn:'',remote:{l:0,r:0,j:0,a:0,d:0,h:0},seen:[[0,0,0,0],[0,0,0,0]],ended:false,koShown:false,
  start(o){this.mode=o.mode;this.me=o.mode==='guest'?1:0;this.names=o.names;this.p1.name=o.names[0];this.p2.name=o.names[1];
   let s=(o.seed>>>0)||1;this.rand=()=>{s=(s+0x6D2B79F5)|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
-  this.score=[0,0];this.round=1;this.prevW=[null,null];this.bot=o.mode==='bot'?new DF.Bot(1):null;this.paused=false;this.ended=false;this.remote={l:0,r:0,j:0,a:0,d:0,h:0};this.seen=[[0,0,0,0],[0,0,0,0]];
+  Picker.hide();this.score=[0,0];this.round=1;this.picks=[null,null];this.bot=o.mode==='bot'?new DF.Bot(1):null;this.paused=false;this.ended=false;this.remote={l:0,r:0,j:0,a:0,d:0,h:0};this.seen=[[0,0,0,0],[0,0,0,0]];
   this.hitstop=0;this.slow=0;cam.z=1;FX.reset();qual=Math.max(qual,baseQual());applyGfx();$('pauseMenu').hidden=true;
   $('heroName').textContent=this.names[0];$('enemyName').textContent=this.names[1]+(o.mode==='guest'?' (YOU)':'');
   for(const k in hudCache)delete hudCache[k];setPips('hero',0);setPips('enemy',0);$('myRounds').textContent=$('botRounds').textContent='0';
   show('duel');this.active=true;Input.clear();resize();last=performance.now();cancelAnimationFrame(raf);raf=requestAnimationFrame(frame);
   SFX.init();SFX.resume();if(o.mode!=='guest')this.beginRound()},
- pickWeapons(){const pick=(not1,not2)=>{let w;do{w=WEAPON_ORDER[(this.rand()*WEAPON_ORDER.length)|0]}while(w===not1||w===not2);return w};
-  const a=pick(this.prevW[0],null),b=pick(this.prevW[1],a);this.prevW=[a,b];return[a,b]},
- beginRound(){const[a,b]=this.pickWeapons();this.applyRound(a,b);if(this.mode==='host')Net.send({t:'round',n:this.round,w:[a,b],sc:this.score})},
- applyRound(a,b){const w1=WEAPONS[a],w2=WEAPONS[b];this.p1.reset(300,1,w1);this.p2.reset(660,-1,w2);this.phase='intro';this.phaseT=0;this.timeLeft=60;this.koShown=false;this.slow=0;
+ rollWeapon(){return WEAPON_ORDER[(Math.random()*WEAPON_ORDER.length)|0]},
+ /* bot / host: open the weapon-pick phase. Picks are hidden until both fighters lock in, then revealed together. */
+ beginRound(){this.picks=[null,null];this.enterPick();
+  if(this.mode==='host')Net.send({t:'pstart',n:this.round,sc:this.score});
+  if(this.mode==='bot')this.botWait=.8+Math.random()*1.4},
+ enterPick(){this.phase='pick';this.phaseT=0;this.pickT=PICK_TIME;this.koShown=false;this.slow=0;this.hitstop=0;
+  if(this.mode!=='guest'){this.p1.reset(300,1,this.p1.weapon);this.p2.reset(660,-1,this.p2.weapon)}
+  FX.reset();Input.clear();$('intro').classList.remove('show');$('roundNo').textContent=this.round;
+  $('heroWeapon').textContent=$('enemyWeapon').textContent='\u2014';this.hud();Picker.show(this.round,this.names[1-this.me]);SFX.ui()},
+ onMyPick(id){if(this.mode==='guest')Net.send({t:'pick',n:this.round,w:id});else{this.picks[0]=id;if(this.mode==='host')Net.send({t:'lock'})}},
+ setRemotePick(id){if(this.phase==='pick'&&WEAPONS[id]&&!this.picks[1]){this.picks[1]=id;Picker.setOpp(true)}},
+ pickStep(dt){this.pickT-=dt;Picker.tick(this.pickT);
+  if(this.mode==='bot'&&!this.picks[1]){this.botWait-=dt;if(this.botWait<=0){this.picks[1]=this.rollWeapon();Picker.setOpp(true)}}
+  if(this.pickT<=0&&!Picker.locked)Picker.autoLock();
+  if(this.mode!=='guest'&&((this.picks[0]&&this.picks[1])||this.pickT<=-1.2))this.resolvePick()},
+ resolvePick(){const a=this.picks[0]||this.rollWeapon(),b=this.picks[1]||this.rollWeapon();this.applyRound(a,b);
+  if(this.mode==='host')Net.send({t:'round',n:this.round,w:[a,b],sc:this.score})},
+ applyRound(a,b){const w1=WEAPONS[a],w2=WEAPONS[b];this.p1.reset(300,1,w1);this.p2.reset(660,-1,w2);this.phase='intro';this.phaseT=0;this.timeLeft=60;this.koShown=false;this.slow=0;Picker.hide();
   FX.reset();Input.clear();
   $('roundNo').textContent=this.round;$('heroWeapon').textContent=w1.name;$('enemyWeapon').textContent=w2.name;this.hud();
   $('intro').innerHTML=weaponCard(this.names[0],w1,'l')+weaponCard(this.names[1],w2,'r');$('intro').classList.add('show');
@@ -137,7 +184,7 @@ const Match={
  onJump(f){FX.dust(f.x,412,4);SFX.jump()},onLand(f){FX.dust(f.x,412,5)},onDash(f){FX.dust(f.x,412,6,-f.dashDir);SFX.dash()},
  onAttackStart(f){if(f.atk&&f.atk.heavy)SFX.charge()},
  onSwing(f){const hv=f.atk&&f.atk.heavy;SFX.swing(f.weapon.dmg>=20||hv);if(hv){SFX.heavy();FX.shake(3);FX.ring(f.x+f.facing*40,f.y-60,f.pal.accent,70,.3)}},
- onSwingEnd(f){if(f.weapon.id==='hammer'||f.weapon.id==='greatblade'){const s=f.seg({});if(s.ty>380){FX.dust(s.tx,412,7);FX.ring(s.tx,410,'#cfd6ff',46,.3);FX.shake(f.weapon.id==='hammer'?3.5:2.5)}}},
+ onSwingEnd(f){if(f.weapon.id==='hammer'||f.weapon.id==='greatblade'){const s=f.seg({});if(s.ty>380){FX.dust(s.tx,412,7);FX.ring(s.tx,410,'#e8d9b5',46,.3);FX.shake(f.weapon.id==='hammer'?3.5:2.5)}}},
  hud(){setPips('hero',this.score[0]);setPips('enemy',this.score[1]);$('myRounds').textContent=this.score[0];$('botRounds').textContent=this.score[1]},
  /* ---- hit resolution ---- */
  _s:{},_pv:{},
@@ -186,7 +233,8 @@ const Match={
   }
   FX.update(dt);Arena.update(dt);cam.z+=(1+(this.slow>0?.05:0)-cam.z)*(1-Math.exp(-dt*7));
   // phase machine (host/bot drive it; guest follows events but runs the same timers for pure presentation)
-  if(this.phase==='intro'&&this.phaseT>=1.55&&this.mode!=='guest')this.startFight();
+  if(this.phase==='intro'&&this.phaseT>=1.8&&this.mode!=='guest')this.startFight();
+  else if(this.phase==='pick')this.pickStep(dt);
   else if(this.phase==='ko'){if(!this.koShown&&this.phaseT>=1.5){this.koShown=true;const w=this.lastWinner,me=this.me;
      if(this.ended)banner(w===me?'VICTORY':'DEFEAT','','end');else banner(w<0?'DRAW':w===me?'ROUND WON':'ROUND LOST',this.score[0]+' — '+this.score[1],'round')}
     if(this.phaseT>=3.2&&this.mode!=='guest')this.finishRound();else if(this.phaseT>=3.2&&this.mode==='guest'&&this.ended){this.phase='end';this.phaseT=0}}
@@ -196,10 +244,11 @@ const Match={
  },
  finish(){if(this.mode==='host'||this.mode==='guest')this.rematchFlags={me:false,opp:false};
   const me=this.me,won=this.score[me]>=4,rw=this.score[me],base=won?150:50,coins=base+rw*10;
-  state.player.coins+=coins;if(won)state.player.wins++;save();this.active=false;
-  $('finalMy').textContent=this.score[0];$('finalBot').textContent=this.score[1];
-  $('resultIcon').innerHTML=ico(won?'trophy':'sword');$('resultEyebrow').textContent=won?'DUEL WON':'DUEL LOST';$('resultTitle').textContent=won?'VICTORY':'DEFEAT';
-  $('resultTitle').className=won?'win':'lose';$('rewardWins').textContent=won?'+1':'0';$('rewardNote').textContent=`${base} base + ${rw} rounds × 10`;
+  const ranked=this.mode!=='bot',P=state.player;P.coins+=coins;if(ranked){if(won)P.mpWins++;else P.mpLosses++}else if(won)P.botWins++;save();this.active=false;
+  $('finalMy').textContent=this.score[me];$('finalBot').textContent=this.score[1-me];
+  $('resultIcon').innerHTML=ico(won?'trophy':'sword');$('resultEyebrow').textContent=(ranked?'RANKED DUEL ':'PRACTICE DUEL ')+(won?'WON':'LOST');$('resultTitle').textContent=won?'VICTORY':'DEFEAT';
+  $('resultTitle').className=won?'win':'lose';$('rewardWins').textContent=ranked?'+1':'\u2014';$('rewardWinsLbl').textContent=ranked?(won?'RANKED WIN':'RANKED LOSS'):'UNRANKED';
+  $('rewardNote').textContent=`${base} base + ${rw} rounds × 10`+(ranked?'':' \u00b7 practice duels never count toward the leaderboard');
   const el=$('rewardCoins');let t0=performance.now();(function tick(n){const k=clamp((n-t0)/900,0,1);el.textContent='+'+Math.round(coins*(1-Math.pow(1-k,3)));if(k<1)requestAnimationFrame(tick)})(t0);
   $('rematchBtn').disabled=false;$('rematchBtn').textContent=this.mode==='bot'?'REMATCH':'REMATCH (BOTH PLAYERS)';show('result')},
  pause(on){if(this.mode==='bot')this.paused=on;$('pauseMenu').hidden=!on;if(!on)last=performance.now()},
@@ -208,7 +257,7 @@ const Match={
 
 /* ================= wiring ================= */
 const pick=a=>a[(Math.random()*a.length)|0];
-const botNames=['IRON WRAITH','GRAVE WARDEN','EMBER KNIGHT','VOID DUELIST'];
+const botNames=['ASHEN WARDEN','GRAVE KNIGHT','EMBER CHAMPION','BLACK MARSHAL','PLAGUE LORD','HOLLOW SENTINEL'];
 function startBot(){Match.start({mode:'bot',names:[state.player.name,pick(botNames)],seed:(Math.random()*1e9)|0})}
 $('botBtn').onclick=startBot;
 $('mpBtn').onclick=()=>{mpMsg('');busy(false);show('mp')};
@@ -233,7 +282,7 @@ $('setGfx').onclick=e=>{const g=e.target.dataset&&e.target.dataset.g;if(!g)retur
 $('setRename').onclick=()=>openName(true);
 
 /* ---- gamertag ---- */
-const TAG1=['SHADOW','IRON','EMBER','VOID','STORM','RAVEN','NOVA','BLAZE','FROST','VIPER'],TAG2=['BLADE','KNIGHT','WRAITH','FANG','HAWK','REAPER','WOLF','DUELIST'];
+const TAG1=['ASH','GRIM','IRON','EMBER','DUSK','RAVEN','BLACK','THORN','CRYPT','BLOOD'],TAG2=['KNIGHT','WARDEN','BLADE','REAVER','MARSHAL','SLAYER','WOLF','LORD'];
 const cleanName=s=>String(s||'').replace(/[^\w\- ]/g,'').replace(/\s+/g,' ').trim().slice(0,14).toUpperCase();
 function openName(canCancel){$('nameIn').value=state.player.name;$('nameErr').textContent='';$('nameCancel').hidden=!canCancel;show('nameScreen');setTimeout(()=>{try{$('nameIn').focus()}catch(e){}},60)}
 function submitName(){const n=cleanName($('nameIn').value);if(n.length<2){$('nameErr').textContent='Use at least 2 letters or numbers.';return}state.player.name=n;save();show('home')}
@@ -290,6 +339,9 @@ function onNet(m){
    else{setSlot(1,remoteName,'HOST',true);roomMsg('Joined! The match starts in a moment',true)}break;
   case'start':clearTimeout(roomT);Match.start({mode:'guest',names:m.names,seed:m.seed});break;
   case'in':if(Match.mode==='host')Match.remote={l:m.l,r:m.r,j:m.j,a:m.a,d:m.d,h:m.h|0};break;
+  case'pstart':if(Match.mode==='guest'&&Match.active){Match.round=m.n;Match.score=m.sc;Match.picks=[null,null];Match.enterPick()}break;
+  case'pick':if(Match.mode==='host'&&m.n===Match.round)Match.setRemotePick(m.w);break;
+  case'lock':if(Match.mode==='guest'&&Match.phase==='pick')Picker.setOpp(true);break;
   case'round':if(Match.mode==='guest'){Match.round=m.n;Match.score=m.sc;Match.applyRound(m.w[0],m.w[1])}break;
   case'ph':if(Match.mode!=='guest')break;if(m.ph==='fight')Match.startFight();else if(m.ph==='ko'){Match.score=m.sc;Match.round=m.r;Match.slow=m.ko?.9:0;Match.phase='fight';Match.showRoundEnd(m.w,!!m.ko)}break;
   case's':if(Match.mode==='guest'&&Match.active){Match.p1.applySnap(m.a,Match);Match.p2.applySnap(m.b,Match);Match.timeLeft=m.tm}break;

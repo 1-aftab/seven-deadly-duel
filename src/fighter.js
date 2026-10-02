@@ -13,10 +13,10 @@ const easeOut=t=>1-(1-t)*(1-t), easeOut3=t=>1-Math.pow(1-t,3), smooth=t=>t*t*(3-
 const bounce=t=>{if(t<.6)return smooth(t/.6)*1.0;if(t<.8)return 1-.06*Math.sin((t-.6)/.2*3.14);return 1};
 
 const PAL=[
- {armor:'#34426b',armor2:'#4d5f95',dark:'#1c2442',cloth:'#1b2a55',cape:'#17306a',trim:'#5de7ff',metal:'#9fb4d8',accent:'#5de7ff'},
- {armor:'#5a2a52',armor2:'#8a3f7d',dark:'#2a1230',cloth:'#4a1747',cape:'#5e1646',trim:'#ff4f9a',metal:'#d6a6c8',accent:'#ff4f9a'}
+ {armor:'#47433b',armor2:'#6d675a',dark:'#1d1a15',cloth:'#2e2417',cape:'#6e4d18',trim:'#d9b25f',metal:'#b9b2a0',accent:'#f0c660'},
+ {armor:'#3d2125',armor2:'#64363a',dark:'#1a0d0f',cloth:'#3a1218',cape:'#7d1620',trim:'#c9473c',metal:'#a89a94',accent:'#ff5a3c'}
 ];
-const PAL_FLASH={armor:'#ffffff',armor2:'#ffffff',dark:'#dfe9ff',cloth:'#eef3ff',cape:'#f4f8ff',trim:'#ffffff',metal:'#ffffff',accent:'#ffffff'};
+const PAL_FLASH={armor:'#ffffff',armor2:'#ffffff',dark:'#efe6d8',cloth:'#f6efe4',cape:'#faf4ea',trim:'#ffffff',metal:'#ffffff',accent:'#ffffff'};
 
 function leg(t,k){const kx=Math.cos(t)*THIGH,ky=Math.sin(t)*THIGH,s=t+k;return{kx,ky,fx:kx+Math.cos(s)*SHIN,fy:ky+Math.sin(s)*SHIN}}
 function ik(sx,sy,tx,ty,a,b,out){let dx=tx-sx,dy=ty-sy,d=Math.hypot(dx,dy);const ang=Math.atan2(dy,dx);d=Math.min(d,a+b-.01);d=Math.max(d,Math.abs(a-b)+.01);
