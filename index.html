@@ -181,49 +181,33 @@
 </svg>
 
 
-<div id="app">
+<section id="splash" class="screen active center">
 
-  <!-- ============ SPLASH ============ -->
+  <div class="splash-wrap">
 
-  <section id="splash" class="screen active center">
+    <svg class="logo-mark lg" aria-hidden="true">
+      <use href="#logo"/>
+    </svg>
 
-    <div class="splash-in">
+    <h1>DUELFORGE</h1>
+    <p class="sub">SEVEN DEADLY DUEL</p>
 
-      <svg class="logo-mark xl pop">
-        <use href="#logo"/>
-      </svg>
-
-      <div class="wordmark xl rise">
-        DUEL<span>FORGE</span>
-      </div>
-
-      <p class="credit rise d1">
-        This game is developed by just two people.
-      </p>
-
-      <p class="credit rise d2">
-        More updates coming soon&hellip;
-      </p>
-
-      <div class="loadbar rise d1">
-        <i></i>
-      </div>
-
-      <small class="tap rise d3">
-        TAP TO CONTINUE
-      </small>
-
+    <div class="loading">
+      <span></span>
     </div>
 
-  </section>
+    <div class="tap">TAP TO ENTER</div>
 
-<!-- ============ AUTHENTICATION ============ -->
+  </div>
+
+</section>
+
 
 <section id="authScreen" class="screen center">
 
   <div class="card narrow auth-card">
 
-    <svg class="logo-mark md">
+    <svg class="logo-mark md" aria-hidden="true">
       <use href="#logo"/>
     </svg>
 
@@ -233,7 +217,6 @@
       Sign in to enter the arena.
     </p>
 
-
     <input
       id="authEmail"
       type="email"
@@ -241,7 +224,6 @@
       placeholder="Email"
       aria-label="Email"
     >
-
 
     <input
       id="authPassword"
@@ -252,713 +234,433 @@
       style="margin-top:8px"
     >
 
-
     <div id="authMessage" class="message"></div>
 
-
-    <button
-      class="primary full"
-      id="authSubmit"
-    >
+    <button class="primary full" id="authSubmit">
       SIGN IN
     </button>
 
-
-    <button
-      class="ghost full"
-      id="authToggle"
-    >
+    <button class="ghost full" id="authToggle">
       CREATE ACCOUNT
     </button>
 
   </div>
 
 </section>
-  <!-- ============ GAMERTAG ============ -->
 
-  <section id="nameScreen" class="screen center">
 
-    <div class="card narrow">
+<section id="nameScreen" class="screen center">
 
-      <svg class="logo-mark md">
-        <use href="#logo"/>
-      </svg>
+  <div class="card narrow">
 
-      <h2>Name your champion</h2>
+    <svg class="logo-mark md" aria-hidden="true">
+      <use href="#logo"/>
+    </svg>
 
-      <p class="sub">
-        Your name is called out before every duel in the arena.
-      </p>
+    <h2>CHOOSE YOUR NAME</h2>
 
-      <div class="field">
+    <p class="sub">
+      Your name will be shown to other fighters.
+    </p>
 
-        <input
-          id="nameIn"
-          maxlength="14"
-          autocomplete="off"
-          autocapitalize="characters"
-          spellcheck="false"
-          placeholder="e.g. AFTAB"
-          aria-label="Gamertag"
-        >
+    <input
+      id="nameInput"
+      maxlength="16"
+      autocomplete="off"
+      placeholder="GAMERTAG"
+      aria-label="Gamertag"
+    >
 
-        <button
-          id="diceBtn"
-          class="icon-btn"
-          aria-label="Random name"
-        >
-          <svg class="i" aria-hidden="true">
-            <use href="#i-dice"/>
-          </svg>
-        </button>
-
-      </div>
-
-      <div id="nameErr" class="message bad"></div>
-
-      <button class="primary full" id="nameOk">
-        ENTER THE ARENA
-      </button>
-
-      <button class="ghost full" id="nameCancel" hidden>
-        CANCEL
-      </button>
-
-    </div>
-
-  </section>
-
-
-  <!-- ============ LOBBY ============ -->
-
-  <section id="home" class="screen">
-
-    <div class="lobby">
-
-      <div class="lobby-top">
-
-        <button
-          id="namePill"
-          class="pill"
-          aria-label="Change gamertag"
-        >
-          <span class="avatar" id="avatar">A</span>
-
-          <span class="pill-t">
-            <small>GAMERTAG</small>
-            <b id="playerName">PLAYER</b>
-          </span>
-
-        </button>
-
-        <div class="top-r">
-
-          <div class="chip">
-            <svg class="i" aria-hidden="true">
-              <use href="#i-coin"/>
-            </svg>
-            <b id="homeCoins">500</b>
-          </div>
-
-          <button
-            id="muteBtn"
-            class="icon-btn"
-            aria-label="Sound"
-          >
-            <svg class="i" aria-hidden="true">
-              <use href="#i-vol"/>
-            </svg>
-          </button>
-
-          <button
-            id="settingsBtn"
-            class="icon-btn"
-            aria-label="Settings"
-          >
-            <svg class="i" aria-hidden="true">
-              <use href="#i-gear"/>
-            </svg>
-          </button>
-
-        </div>
-
-      </div>
-
-
-      <div class="lobby-main">
-
-        <div class="brand-block">
-
-          <svg class="logo-mark xl">
-            <use href="#logo"/>
-          </svg>
-
-          <div class="wordmark lg">
-            DUEL<span>FORGE</span>
-          </div>
-
-          <div class="tagline">
-            Best of 7 &middot; choose your weapon every round
-          </div>
-
-          <div class="stats">
-
-            <div>
-              <b id="homeWins">0</b>
-              <small>DUEL WINS</small>
-            </div>
-
-            <div>
-              <b id="homeRank">#1</b>
-              <small>RANK</small>
-            </div>
-
-          </div>
-
-        </div>
-
-
-        <nav class="menu">
-
-          <button class="mbtn hot" id="botBtn">
-
-            <span class="ico">
-              <svg class="i" aria-hidden="true">
-                <use href="#i-bot"/>
-              </svg>
-            </span>
-
-            <span class="lbl">
-              <b>Play with bots</b>
-              <small>Practice duel &middot; unranked</small>
-            </span>
-
-            <svg class="i chev" aria-hidden="true">
-              <use href="#i-chev"/>
-            </svg>
-
-          </button>
-
-
-          <button class="mbtn" id="mpBtn">
-
-            <span class="ico">
-              <svg class="i" aria-hidden="true">
-                <use href="#i-users"/>
-              </svg>
-            </span>
-
-            <span class="lbl">
-              <b>Multiplayer</b>
-              <small>Ranked duels &middot; create or join a room</small>
-            </span>
-
-            <svg class="i chev" aria-hidden="true">
-              <use href="#i-chev"/>
-            </svg>
-
-          </button>
-
-
-          <button class="mbtn" id="leaderBtn">
-
-            <span class="ico">
-              <svg class="i" aria-hidden="true">
-                <use href="#i-trophy"/>
-              </svg>
-            </span>
-
-            <span class="lbl">
-              <b>Leaderboard</b>
-              <small>Ranked by multiplayer wins</small>
-            </span>
-
-            <svg class="i chev" aria-hidden="true">
-              <use href="#i-chev"/>
-            </svg>
-
-          </button>
-
-        </nav>
-
-      </div>
-
-
-      <div class="lobby-foot">
-        A/D move &middot; W jump &middot; J attack &middot; K power &middot; L dash &middot; pick a weapon each round
-      </div>
-
-    </div>
-
-  </section>
-
-
-  <!-- ============ MULTIPLAYER MENU ============ -->
-
-  <section id="mp" class="screen">
-
-    <div class="sub-screen">
-
-      <header class="sub-head">
-
-        <button
-          class="back"
-          data-home
-          aria-label="Back"
-        >
-          <svg class="i" aria-hidden="true">
-            <use href="#i-back"/>
-          </svg>
-        </button>
-
-        <h2>Multiplayer</h2>
-
-      </header>
-
-
-      <div class="mp-grid">
-
-        <div class="card opt">
-
-          <span class="ico big">
-            <svg class="i" aria-hidden="true">
-              <use href="#i-plus"/>
-            </svg>
-          </span>
-
-          <b>Create room</b>
-
-          <p class="sub">
-            Get a 4-digit code and share it with your rival. Ranked duel.
-          </p>
-
-          <button class="primary full" id="mkRoom">
-            CREATE ROOM
-          </button>
-
-        </div>
-
-
-        <div class="card opt">
-
-          <span class="ico big">
-            <svg class="i" aria-hidden="true">
-              <use href="#i-door"/>
-            </svg>
-          </span>
-
-          <b>Join room</b>
-
-          <p class="sub">
-            Enter the 4-digit code your friend gave you.
-          </p>
-
-          <input
-            id="codeIn"
-            class="code-in"
-            inputmode="numeric"
-            pattern="[0-9]*"
-            maxlength="4"
-            autocomplete="off"
-            placeholder="0000"
-            aria-label="Room code"
-          >
-
-          <button class="primary full" id="joinBtn">
-            JOIN ROOM
-          </button>
-
-        </div>
-
-      </div>
-
-      <div id="mpMsg" class="message"></div>
-
-    </div>
-
-  </section>
-
-
-  <!-- ============ ROOM LOBBY ============ -->
-
-  <section id="room" class="screen">
-
-    <div class="sub-screen">
-
-      <header class="sub-head">
-
-        <button
-          class="back"
-          id="leaveRoom"
-          aria-label="Leave room"
-        >
-          <svg class="i" aria-hidden="true">
-            <use href="#i-back"/>
-          </svg>
-        </button>
-
-        <h2>Room lobby</h2>
-
-      </header>
-
-
-      <div class="card room-card">
-
-        <small class="cap">ROOM CODE</small>
-
-        <div class="code" id="roomCode">
-          <i>-</i>
-          <i>-</i>
-          <i>-</i>
-          <i>-</i>
-        </div>
-
-
-        <div class="row-btns" id="codeBtns">
-
-          <button class="secondary" id="copyCode">
-            <svg class="i" aria-hidden="true">
-              <use href="#i-copy"/>
-            </svg>
-            COPY
-          </button>
-
-          <button class="secondary" id="shareCode">
-            <svg class="i" aria-hidden="true">
-              <use href="#i-share"/>
-            </svg>
-            SHARE
-          </button>
-
-        </div>
-
-
-        <div class="slots">
-
-          <div class="slot">
-
-            <span class="avatar" id="s1a">?</span>
-
-            <b id="s1n">&hellip;</b>
-
-            <small id="s1r">HOST</small>
-
-          </div>
-
-
-          <span class="vs">VS</span>
-
-
-          <div class="slot" id="slot2">
-
-            <span class="avatar empty" id="s2a">?</span>
-
-            <b id="s2n">Waiting&hellip;</b>
-
-            <small id="s2r">GUEST</small>
-
-          </div>
-
-        </div>
-
-
-        <div id="roomMsg" class="message wait">
-          Waiting for opponent
-        </div>
-
-      </div>
-
-    </div>
-
-  </section>
-
-
-  <!-- ============ LEADERBOARD ============ -->
-
-  <section id="leaderboard" class="screen">
-
-    <div class="sub-screen">
-
-      <header class="sub-head">
-
-        <button
-          class="back"
-          data-home
-          aria-label="Back"
-        >
-          <svg class="i" aria-hidden="true">
-            <use href="#i-back"/>
-          </svg>
-        </button>
-
-        <h2>Leaderboard</h2>
-
-      </header>
-
-
-      <div class="me-card" id="meCard"></div>
-
-      <div id="board" class="board"></div>
-
-      <p class="foot-note" id="boardNote">
-        Only multiplayer duels are ranked &mdash; matches against bots never count.
-        Standings are saved on this device; the sample champions are placeholders
-        until online rankings arrive.
-      </p>
-
-    </div>
-
-  </section>
-
-
-  <!-- ============ SETTINGS ============ -->
-
-  <section id="settings" class="screen">
-
-    <div class="sub-screen">
-
-      <header class="sub-head">
-
-        <button
-          class="back"
-          data-home
-          aria-label="Back"
-        >
-          <svg class="i" aria-hidden="true">
-            <use href="#i-back"/>
-          </svg>
-        </button>
-
-        <h2>Settings</h2>
-
-      </header>
-
-
-      <div class="card list">
-
-        <div class="set-row">
-
-          <div>
-            <b>Sound</b>
-            <small>Effects and music cues</small>
-          </div>
-
-          <button
-            class="toggle"
-            id="setSound"
-            role="switch"
-            aria-checked="true"
-          >
-            <i></i>
-          </button>
-
-        </div>
-
-
-        <div class="set-row">
-
-          <div>
-            <b>Graphics</b>
-            <small>
-              Low mode saves battery and boosts FPS on older phones
-            </small>
-          </div>
-
-          <div class="seg" id="setGfx">
-            <button data-g="auto">AUTO</button>
-            <button data-g="low">LOW</button>
-          </div>
-
-        </div>
-
-
-        <div class="set-row">
-
-          <div>
-            <b>Gamertag</b>
-            <small id="setName">PLAYER</small>
-          </div>
-
-          <button class="secondary" id="setRename">
-            CHANGE
-          </button>
-
-        </div>
-
-      </div>
-
-
-      <p class="foot-note">
-        DuelForge &middot; made by two people &middot; more updates coming soon.
-      </p>
-
-    </div>
-
-  </section>
-
-
-  <!-- ============ RESULT ============ -->
-
-  <section id="result" class="screen center">
-
-    <div class="result-card">
-
-      <div id="resultIcon" class="result-icon">
-
-        <svg class="i" aria-hidden="true">
-          <use href="#i-trophy"/>
-        </svg>
-
-      </div>
-
-      <div class="eyebrow" id="resultEyebrow">
-        DUEL WON
-      </div>
-
-      <h2 id="resultTitle">
-        VICTORY
-      </h2>
-
-      <div class="final-score">
-
-        <b id="finalMy">4</b>
-
-        <span>&mdash;</span>
-
-        <b id="finalBot">2</b>
-
-      </div>
-
-
-      <div class="rewards">
-
-        <div>
-          <svg class="i" aria-hidden="true">
-            <use href="#i-trophy"/>
-          </svg>
-          <b id="rewardWins">+1</b>
-          <small id="rewardWinsLbl">WIN</small>
-        </div>
-
-        <div>
-          <svg class="i" aria-hidden="true">
-            <use href="#i-coin"/>
-          </svg>
-          <b id="rewardCoins">+150</b>
-          <small>COINS</small>
-        </div>
-
-      </div>
-
-
-      <div class="reward-note" id="rewardNote"></div>
-
-      <button class="primary full" id="rematchBtn">
-        REMATCH
-      </button>
-
-      <button class="ghost full" id="resultHome">
-        RETURN TO LOBBY
-      </button>
-
-    </div>
-
-  </section>
-
-</div>
-
-
-<!-- ============ DUEL ============ -->
-
-<section id="duel" class="screen">
-
-  <canvas id="game"></canvas>
-
-  <div id="hud">
-
-    <div class="hud-side left">
-
-      <div class="hud-name">
-        <b id="heroName">PLAYER</b>
-        <span class="wchip" id="heroWeapon">SWORD</span>
-      </div>
-
-      <div class="hbar">
-        <i class="ghost" id="heroGhost"></i>
-        <i class="fill" id="heroHp"></i>
-        <em id="heroHpText">100</em>
-      </div>
-
-      <div class="pips" id="heroPips"></div>
-
-    </div>
-
-
-    <div class="hud-mid">
-
-      <div class="round-label">
-        ROUND <b id="roundNo">1</b>/7
-      </div>
-
-      <div id="timer">60</div>
-
-      <div class="scoreline">
-        <b id="myRounds">0</b>
-        &mdash;
-        <b id="botRounds">0</b>
-      </div>
-
-    </div>
-
-
-    <div class="hud-side right">
-
-      <div class="hud-name">
-        <span class="wchip" id="enemyWeapon">SWORD</span>
-        <b id="enemyName">IRON WRAITH</b>
-      </div>
-
-      <div class="hbar enemy">
-        <i class="ghost" id="enemyGhost"></i>
-        <i class="fill" id="enemyHp"></i>
-        <em id="enemyHpText">100</em>
-      </div>
-
-      <div class="pips" id="enemyPips"></div>
-
-    </div>
+    <button class="primary full" id="nameBtn">
+      ENTER ARENA
+    </button>
 
   </div>
 
+</section>
 
-  <div id="cds">
 
-    <div class="cd-row">
-      <label>ATTACK</label>
-      <span><i id="cdA"></i></span>
+<section id="home" class="screen">
+
+  <header class="topbar">
+
+    <div class="brand">
+
+      <svg class="logo-mark sm" aria-hidden="true">
+        <use href="#logo"/>
+      </svg>
+
+      <div>
+        <strong>DUELFORGE</strong>
+        <small>SEVEN DEADLY DUEL</small>
+      </div>
+
     </div>
 
-    <div class="cd-row">
-      <label>POWER</label>
-      <span><i id="cdH"></i></span>
+    <div class="top-actions">
+
+      <button id="soundBtn" class="icon-btn" aria-label="Sound">
+        <svg class="i">
+          <use href="#i-vol"/>
+        </svg>
+      </button>
+
+      <button id="settingsBtn" class="icon-btn" aria-label="Settings">
+        <svg class="i">
+          <use href="#i-gear"/>
+        </svg>
+      </button>
+
+    </div>
+
+  </header>
+
+
+  <main class="home-main">
+
+    <div class="hero">
+
+      <svg class="logo-mark hero-logo" aria-hidden="true">
+        <use href="#logo"/>
+      </svg>
+
+      <h1>ENTER THE ARENA</h1>
+
+      <p class="sub">
+        Choose your battle.
+      </p>
+
+    </div>
+
+
+    <div class="home-grid">
+
+      <button class="mode-card" id="botBtn">
+
+        <div class="mode-icon">
+
+          <svg class="i">
+            <use href="#i-bot"/>
+          </svg>
+
+        </div>
+
+        <div>
+          <strong>VS BOT</strong>
+          <span>Fight the machine</span>
+        </div>
+
+      </button>
+
+
+      <button class="mode-card" id="mpBtn">
+
+        <div class="mode-icon">
+
+          <svg class="i">
+            <use href="#i-users"/>
+          </svg>
+
+        </div>
+
+        <div>
+          <strong>MULTIPLAYER</strong>
+          <span>Fight another player</span>
+        </div>
+
+      </button>
+
+
+      <button class="mode-card" id="leaderBtn">
+
+        <div class="mode-icon">
+
+          <svg class="i">
+            <use href="#i-trophy"/>
+          </svg>
+
+        </div>
+
+        <div>
+          <strong>LEADERBOARD</strong>
+          <span>View the champions</span>
+        </div>
+
+      </button>
+
+    </div>
+
+  </main>
+
+</section>
+
+
+<section id="mp" class="screen">
+
+  <header class="topbar">
+
+    <button class="back-btn" id="mpBack" aria-label="Back">
+      <svg class="i">
+        <use href="#i-back"/>
+      </svg>
+    </button>
+
+    <h2>MULTIPLAYER</h2>
+
+  </header>
+
+
+  <main class="page-main">
+
+    <div class="mp-grid">
+
+      <div class="card">
+
+        <h3>CREATE ROOM</h3>
+
+        <p class="sub">
+          Create a room and invite another fighter.
+        </p>
+
+        <button class="primary full" id="createRoom">
+          CREATE ROOM
+        </button>
+
+      </div>
+
+
+      <div class="card">
+
+        <h3>JOIN ROOM</h3>
+
+        <p class="sub">
+          Enter a room code.
+        </p>
+
+        <input
+          id="roomInput"
+          maxlength="8"
+          autocomplete="off"
+          placeholder="ROOM CODE"
+          aria-label="Room code"
+        >
+
+        <button class="secondary full" id="joinRoom">
+          JOIN ROOM
+        </button>
+
+      </div>
+
+    </div>
+
+  </main>
+
+</section>
+
+
+<section id="room" class="screen center">
+
+  <div class="card narrow">
+
+    <svg class="logo-mark md" aria-hidden="true">
+      <use href="#logo"/>
+    </svg>
+
+    <h2 id="roomTitle">ROOM</h2>
+
+    <div class="room-code" id="roomCode"></div>
+
+    <p class="sub" id="roomStatus">
+      Waiting for opponent...
+    </p>
+
+    <button class="secondary full" id="copyRoom">
+      <svg class="i">
+        <use href="#i-copy"/>
+      </svg>
+      COPY CODE
+    </button>
+
+    <button class="ghost full" id="leaveRoom">
+      LEAVE ROOM
+    </button>
+
+  </div>
+
+</section>
+
+
+<section id="leaderboard" class="screen">
+
+  <header class="topbar">
+
+    <button class="back-btn" id="leaderBack" aria-label="Back">
+      <svg class="i">
+        <use href="#i-back"/>
+      </svg>
+    </button>
+
+    <h2>LEADERBOARD</h2>
+
+  </header>
+
+
+  <main class="page-main">
+
+    <div class="card">
+
+      <div id="leaderRows"></div>
+
+    </div>
+
+  </main>
+
+</section>
+
+
+<section id="settings" class="screen">
+
+  <header class="topbar">
+
+    <button class="back-btn" id="settingsBack" aria-label="Back">
+      <svg class="i">
+        <use href="#i-back"/>
+      </svg>
+    </button>
+
+    <h2>SETTINGS</h2>
+
+  </header>
+
+
+  <main class="page-main">
+
+    <div class="card settings-card">
+
+      <div class="setting-row">
+
+        <div>
+          <strong>SOUND</strong>
+          <span>Game audio</span>
+        </div>
+
+        <button id="settingsSound" class="toggle">
+          ON
+        </button>
+
+      </div>
+
+
+      <div class="setting-row">
+
+        <div>
+          <strong>PLAYER</strong>
+          <span id="settingsPlayer">-</span>
+        </div>
+
+      </div>
+
+
+      <div class="setting-row">
+
+        <div>
+          <strong>ACCOUNT</strong>
+          <span id="settingsAccount">Signed in</span>
+        </div>
+
+        <button id="logoutBtn" class="danger">
+          LOG OUT
+        </button>
+
+      </div>
+
+    </div>
+
+  </main>
+
+</section>
+
+
+<section id="result" class="screen center">
+
+  <div class="card narrow result-card">
+
+    <div id="resultIcon"></div>
+
+    <h2 id="resultTitle">VICTORY</h2>
+
+    <p id="resultSub" class="sub"></p>
+
+    <div id="resultStats"></div>
+
+    <button class="primary full" id="resultRematch">
+      REMATCH
+    </button>
+
+    <button class="ghost full" id="resultLobby">
+      BACK TO LOBBY
+    </button>
+
+  </div>
+
+</section>
+
+
+<section id="duel" class="screen">
+
+  <canvas id="gameCanvas"></canvas>
+
+  <div id="hud">
+
+    <div class="hud-player">
+
+      <div class="hud-name" id="pName"></div>
+
+      <div class="health">
+        <div id="pHp"></div>
+      </div>
+
+    </div>
+
+
+    <div id="roundInfo">
+      <span id="roundText">ROUND 1</span>
+      <span id="roundTimer">60</span>
+    </div>
+
+
+    <div class="hud-player enemy">
+
+      <div class="hud-name" id="eName"></div>
+
+      <div class="health">
+        <div id="eHp"></div>
+      </div>
+
     </div>
 
   </div>
 
 
   <button id="pauseBtn" aria-label="Pause">
+
     <svg class="i" aria-hidden="true">
       <use href="#i-pause"/>
     </svg>
+
   </button>
 
 
   <div id="intro"></div>
 
+
   <div id="banner">
+
     <div id="bannerMain"></div>
     <div id="bannerSub"></div>
+
   </div>
+
 
   <div id="hitFlash"></div>
 
@@ -1012,4 +714,104 @@
 
       <button id="rightBtn" aria-label="Right">
         <svg class="i" aria-hidden="true">
-     
+          <use href="#i-chev"/>
+        </svg>
+      </button>
+
+    </div>
+
+
+    <div id="actions">
+
+      <button id="dashBtn" class="act dash">
+        DASH
+      </button>
+
+      <button id="jumpBtn" class="act jump">
+        JUMP
+      </button>
+
+      <button id="heavyBtn" class="act heavy">
+
+        <svg class="i" aria-hidden="true">
+          <use href="#i-bolt"/>
+        </svg>
+
+        <small>POWER</small>
+
+        <span class="cd"></span>
+
+      </button>
+
+      <button id="attackBtn" class="act attack">
+
+        <svg class="i" aria-hidden="true">
+          <use href="#i-sword"/>
+        </svg>
+
+        <small>ATTACK</small>
+
+        <span class="cd"></span>
+
+      </button>
+
+    </div>
+
+  </div>
+
+
+  <div id="pauseMenu" hidden>
+
+    <div class="pause-card">
+
+      <h3>PAUSED</h3>
+
+      <button class="primary full" id="resumeBtn">
+        RESUME
+      </button>
+
+      <button class="secondary full" id="fsBtn">
+        FULLSCREEN
+      </button>
+
+      <button class="ghost full" id="quitDuel">
+        QUIT TO LOBBY
+      </button>
+
+    </div>
+
+  </div>
+
+
+  <div id="rotate">
+
+    <div>
+      ROTATE YOUR DEVICE
+      <small>DuelForge plays in landscape</small>
+    </div>
+
+  </div>
+
+</section>
+
+
+<!-- Supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- Supabase configuration -->
+<script src="src/supabase.js"></script>
+
+<!-- Authentication -->
+<script src="src/auth.js"></script>
+
+<!-- Game -->
+<script src="src/weapons.js"></script>
+<script src="src/fx.js"></script>
+<script src="src/fighter.js"></script>
+<script src="src/arena.js"></script>
+<script src="src/bot.js"></script>
+<script src="src/net.js"></script>
+<script src="src/game.js"></script>
+
+</body>
+  </html>
