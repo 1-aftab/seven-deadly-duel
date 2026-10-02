@@ -17,6 +17,7 @@ const PAL=[
  {armor:'#3d2125',armor2:'#64363a',dark:'#1a0d0f',cloth:'#3a1218',cape:'#7d1620',trim:'#c9473c',metal:'#a89a94',accent:'#ff5a3c'}
 ];
 const PAL_FLASH={armor:'#ffffff',armor2:'#ffffff',dark:'#efe6d8',cloth:'#f6efe4',cape:'#faf4ea',trim:'#ffffff',metal:'#ffffff',accent:'#ffffff'};
+const palAccent=pal=>pal&&pal.accent||'#f0c660';
 
 function leg(t,k){const kx=Math.cos(t)*THIGH,ky=Math.sin(t)*THIGH,s=t+k;return{kx,ky,fx:kx+Math.cos(s)*SHIN,fy:ky+Math.sin(s)*SHIN}}
 function ik(sx,sy,tx,ty,a,b,out){let dx=tx-sx,dy=ty-sy,d=Math.hypot(dx,dy);const ang=Math.atan2(dy,dx);d=Math.min(d,a+b-.01);d=Math.max(d,Math.abs(a-b)+.01);
@@ -38,7 +39,11 @@ class Fighter{
   this.dashCd=Math.max(0,this.dashCd-dt);this.atkCd=Math.max(0,this.atkCd-dt);this.hvCd=Math.max(0,this.hvCd-dt);this.powerCd=Math.max(0,this.powerCd-dt);this.powerT=Math.max(0,this.powerT-dt);this.inv=Math.max(0,this.inv-dt);this.flash-=dt;this.landT-=dt;this.shakeT-=dt;
   I.jump=Math.max(0,I.jump-dt);I.attack=Math.max(0,I.attack-dt);I.dash=Math.max(0,I.dash-dt);I.heavy=Math.max(0,I.heavy-dt);
   const dir=(I.right?1:0)-(I.left?1:0),mods=this.mods||{},armor=mods.armor||null,pow=mods.power||null,spd=WALK*w.speed*(1+(armor&&armor.stats.speed||0)+(pow&&pow.stats.speed||0)+(this.powerKind==='bloodrush'&&this.powerT>0?(pow&&pow.stats.speed||.28):0));
-  const faceOpp=()=>{const dx=opp.x-this.x;if(Math.abs(dx)>6)this.facing=dx>0?1:-1};
+  const faceOpp=()=>{
+   const dx=opp.x-this.x;
+   if(dir!==0)this.facing=dir;
+   else if(Math.abs(dx)>6)this.facing=dx>0?1:-1;
+  };
   const m=this.mode;
   if(m==='free'){
    faceOpp();
@@ -153,7 +158,7 @@ startPower(G,pow){this.input.heavy=0;const st=pow.stats||{},type=st.type||'';thi
  drawShadow(c){const h=clamp((GROUND-this.y)/160,0,1),rx=34*(1-h*.4),a=.5*(1-h*.6);if(this.mode==='ko'&&this.modeT>.2){}
   c.globalAlpha=a;c.fillStyle='#000';c.beginPath();c.ellipse(this.x,GROUND+5,rx,7*(1-h*.3),0,0,6.283);c.fill();
   c.globalCompositeOperation='lighter';c.globalAlpha=.12*(1-h);c.fillStyle=this.pal.accent;c.beginPath();c.ellipse(this.x,GROUND+5,rx*1.1,6,0,0,6.283);c.fill();c.globalCompositeOperation='source-over';c.globalAlpha=1}
- drawGhosts(c){const ch=DF.Characters&&DF.Characters.get?DF.Characters.get(this.characterId):null;const im=ch&&DF.Characters.images[this.characterId];if(!im||!im.complete)return;for(const g of this.ghosts){c.save();c.translate(g.x,g.y);c.scale(g.f*.42,.42);c.globalAlpha=Math.max(0,g.a)*.22;c.globalCompositeOperation='screen';c.drawImage(im,-42,-190,84,190);c.restore()}c.globalAlpha=1;c.globalCompositeOperation='source-over'}
+ drawGhosts(c){const ch=DF.Characters&&DF.Characters.get?DF.Characters.get(this.characterId):null;const im=ch&&DF.Characters.images[this.characterId];if(!im||!im.complete)return;for(const g of this.ghosts){c.save();c.translate(g.x,g.y);c.scale(g.f*.42,.42);c.globalAlpha=Math.max(0,g.a)*.18;c.globalCompositeOperation='source-over';c.drawImage(im,-52,-190,104,190);c.restore()}c.globalAlpha=1;c.globalCompositeOperation='source-over'}
  drawTrail(c){const T=this.trail;if(T.length<2)return;const w=this.weapon,N=4;c.globalCompositeOperation='lighter';c.lineJoin='round';const col=this.pal.accent,bx=[],by=[],tx=[],ty=[];
   for(let i=1;i<T.length;i++){const a=T[i-1],b=T[i],k=1-b.age/.17;if(k<=0)continue;let da=b.a-a.a;while(da>Math.PI)da-=6.2832;while(da<-Math.PI)da+=6.2832;
    for(let j=0;j<=N;j++){const u=j/N,an=a.a+da*u,gx=a.gx+(b.gx-a.gx)*u,gy=a.gy+(b.gy-a.gy)*u,cx=Math.cos(an),cy=Math.sin(an);bx[j]=gx+cx*w.seg0;by[j]=gy+cy*w.seg0;tx[j]=gx+cx*w.len;ty[j]=gy+cy*w.len}
@@ -166,25 +171,59 @@ startPower(G,pow){this.input.heavy=0;const st=pow.stats||{},type=st.type||'';thi
   if(!ch||!im||!im.complete||!im.naturalWidth)return false;
   const t=this.animT, m=this.mode;
   let bob=Math.sin(t*2.4)*1.4, sx=1, sy=1, rot=0, ox=0, oy=0;
-  if(m==='free'&&Math.abs(this.vx)>14){bob=Math.sin(t*11)*2.2;sx=1+Math.sin(t*11)*.018;rot=Math.sin(t*11)*.025}
-  if(m==='attack'&&this.atk){const a=this.atk;const p=a.phase===0?clamp(a.t/a.W,0,1):a.phase===1?1:1-clamp(a.t/a.R,0,1);ox=this.facing*p*13;rot=this.facing*(a.phase===1?.045:-.02);sx=1+.035*p;sy=1-.025*p}
+  const moving=m==='free'&&Math.abs(this.vx)>14;
+  if(moving){bob=Math.sin(t*11)*2.2;sx=1+Math.sin(t*11)*.018;rot=Math.sin(t*11)*.025}
+  if(m==='attack'&&this.atk){
+   const a=this.atk;
+   const p=a.phase===0?clamp(a.t/a.W,0,1):a.phase===1?clamp(a.t/a.S,0,1):1-clamp(a.t/a.R,0,1);
+   ox=this.facing*p*13;rot=this.facing*(a.phase===0?-0.025:a.phase===1?.055:-.025);sx=1+.035*p;sy=1-.025*p;
+  }
   if(m==='hurt'){rot=-this.facing*.09;ox=-this.facing*5}
-  if(m==='dash'){ox=this.dashDir*10;sy=.97;sx=1.06}
+  if(m==='dash'){ox=this.dashDir*10;sy=.97;sx=1.06;rot=this.dashDir*.045}
   if(!this.grounded&&m!=='ko'){oy=6;rot=this.facing*.035}
   if(m==='ko'){rot=this.facing*.65;oy=30;sx=1.08;sy=.72}
   if(m==='win'){bob=Math.sin(t*3)*3;sy=1.03}
-  const H=190,W=84;
+  const H=190,W=104;
+
   c.save();c.translate(ox,oy+bob);c.rotate(rot);c.scale(this.facing*sx,sy);
   c.globalAlpha=this.flash>0?.72:1;
-  // The source art has a dark presentation background; screen compositing lets the arena show through it.
-  c.globalCompositeOperation='screen';
+  c.globalCompositeOperation='source-over';
   c.drawImage(im,-W/2,-H,W,H);
-  c.globalCompositeOperation='source-over';c.globalAlpha=1;
-  // character-specific accent glow keeps the sprite readable on the dark arena
-  c.globalCompositeOperation='lighter';c.globalAlpha=.06; c.fillStyle=ch.color; c.beginPath();c.ellipse(0,-92,34,88,0,0,6.283);c.fill();
+  c.globalAlpha=1;
+
+  const w=this.weapon;
+  let weaponAngle=-0.72,weaponX=18,weaponY=-92,glow=0;
+  if(m==='attack'&&this.atk){
+   const a=this.atk;
+   const p=a.phase===0?clamp(a.t/a.W,0,1):a.phase===1?clamp(a.t/a.S,0,1):1-clamp(a.t/a.R,0,1);
+   if(a.phase===0){weaponAngle=-1.65+1.0*p;weaponX=12+10*p;weaponY=-91+4*p}
+   else if(a.phase===1){weaponAngle=.95-2.25*p;weaponX=22+10*p;weaponY=-91-5*p;glow=.9}
+   else {weaponAngle=-1.25+.5*p;weaponX=17;weaponY=-91;glow=.25}
+   if(a.heavy)glow=1;
+  }else if(m==='hurt'){weaponAngle=-1;weaponX=14;weaponY=-89}
+  else if(m==='dash'){weaponAngle=-.95;weaponX=15;weaponY=-91}
+  else if(!this.grounded){weaponAngle=-1.05;weaponX=16;weaponY=-90}
+  else if(m==='ko'){weaponAngle=.7;weaponX=10;weaponY=-72}
+  else if(m==='win'){weaponAngle=-1.35;weaponX=18;weaponY=-92}
+
+  const skin=this.mods&&this.mods.weaponSkin&&this.mods.weaponSkin.stats&&this.mods.weaponSkin.stats.accent||palAccent(this.pal);
+  c.save();c.translate(weaponX,weaponY);c.rotate(weaponAngle);c.globalCompositeOperation='source-over';
+  DF.drawWeapon(c,w.id,skin,glow);c.restore();
+
+  if(m==='attack'&&this.atk&&this.atk.phase===1){
+   const p=clamp(this.atk.t/this.atk.S,0,1);
+   c.save();c.globalCompositeOperation='lighter';c.globalAlpha=.18+.42*Math.sin(Math.PI*p);
+   c.strokeStyle=ch.color||this.pal.accent;c.lineWidth=this.atk.heavy?7:4;
+   c.beginPath();c.arc(23,-91,42,-1.45+.35*p,.55+1.0*p);c.stroke();
+   c.globalAlpha=.75*Math.sin(Math.PI*p);c.strokeStyle='#fff';c.lineWidth=1.5;
+   c.beginPath();c.arc(23,-91,44,-1.4+.35*p,.5+1.0*p);c.stroke();c.restore();
+  }
+  c.globalCompositeOperation='lighter';c.globalAlpha=.045;c.fillStyle=ch.color;
+  c.beginPath();c.ellipse(0,-92,34,88,0,0,6.283);c.fill();
   c.globalAlpha=1;c.globalCompositeOperation='source-over';c.restore();
   return true;
-}
+ }
+
  draw(c){
   const R=this.rig,P=this.pose,pal=this.flash>0?PAL_FLASH:this.pal,w=this.weapon;
   const jx=this.shakeT>0?(Math.random()-.5)*5:0;

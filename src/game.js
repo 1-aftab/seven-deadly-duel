@@ -82,14 +82,22 @@ addEventListener('keydown',e=>{if(!Match.active)return;const k=KEYMAP[e.key.toLo
 addEventListener('keyup',e=>{const k=KEYMAP[e.key.toLowerCase()];if(k==='L'||k==='R'){held[k]=false;Input.dir(held.L,held.R)}});
 addEventListener('blur',()=>{held.L=held.R=false;Input.clear()});
 (function touch(){
- const dpad=$('dpad');let ptr=null;
- const upd=e=>{const r=dpad.getBoundingClientRect(),x=e.clientX-r.left;const l=x<r.width*.5;Input.dir(l,!l)};
- dpad.addEventListener('pointerdown',e=>{e.preventDefault();ptr=e.pointerId;try{dpad.setPointerCapture(ptr)}catch(x){}upd(e);const side=e.clientX<dpad.getBoundingClientRect().left+dpad.getBoundingClientRect().width*.5?'L':'R';Input.tapDir(side);SFX.init();SFX.resume()});
- dpad.addEventListener('pointermove',e=>{if(e.pointerId===ptr)upd(e)});
- const up=e=>{if(e.pointerId===ptr){ptr=null;Input.dir(held.L,held.R)}};dpad.addEventListener('pointerup',up);dpad.addEventListener('pointercancel',up);
+ const dpad=$('dpad');let ptr=null;let touchDir=null;
+ const setTouchDir=k=>{touchDir=k;Input.dir(k==='L',k==='R');Input.tapDir(k);SFX.init();SFX.resume()};
+ const clearTouch=()=>{touchDir=null;Input.dir(held.L,held.R)};
+ [['leftBtn','L'],['rightBtn','R']].forEach(([id,k])=>{
+  const b=$(id);
+  b.style.pointerEvents='auto';
+  b.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();ptr=e.pointerId;try{b.setPointerCapture(ptr)}catch(x){}b.classList.add('on');setTouchDir(k)});
+  const move=e=>{if(e.pointerId!==ptr)return;e.preventDefault();setTouchDir(k)};
+  b.addEventListener('pointermove',move);
+  const up=e=>{if(e.pointerId!==ptr)return;ptr=null;b.classList.remove('on');clearTouch()};
+  b.addEventListener('pointerup',up);b.addEventListener('pointercancel',up);b.addEventListener('lostpointercapture',up);
+ });
  [['attackBtn','a'],['heavyBtn','h'],['jumpBtn','j'],['dashBtn','d']].forEach(([id,k])=>{const b=$(id);
   b.addEventListener('pointerdown',e=>{e.preventDefault();b.classList.add('down');Input.press(k)});
-  const off=()=>b.classList.remove('down');b.addEventListener('pointerup',off);b.addEventListener('pointercancel',off);b.addEventListener('pointerleave',off)});
+  const off=()=>b.classList.remove('down');b.addEventListener('pointerup',off);b.addEventListener('pointercancel',off);b.addEventListener('pointerleave',off);
+ });
  const duel=$('duel');duel.addEventListener('touchmove',e=>e.preventDefault(),{passive:false});duel.addEventListener('touchstart',e=>{if(!e.target.closest('#pauseMenu,#picker'))e.preventDefault()},{passive:false});
  duel.addEventListener('contextmenu',e=>e.preventDefault());document.addEventListener('gesturestart',e=>e.preventDefault());
  const coarse=matchMedia('(pointer:coarse)').matches||navigator.maxTouchPoints>0||'ontouchstart' in window;document.body.classList.toggle('touch',coarse);
