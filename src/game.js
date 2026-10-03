@@ -160,7 +160,10 @@ const Picker={built:false,on:false,sel:null,locked:false,opp:false,tShown:-1,
  show(round,foe){this.build();this.on=true;this.sel=null;this.locked=false;this.opp=false;this.tShown=-1;
   $('picker').hidden=false;$('picker').classList.remove('locked');$('pkSub').textContent='ROUND '+round+' \u00b7 vs '+foe;
   $('pkLock').disabled=true;$('pkLock').textContent='LOCK IN';
-  [...$('pkGrid').children].forEach(c=>c.classList.remove('sel'));this.status()},
+  [...$('pkGrid').children].forEach(c=>c.classList.remove('sel'));
+  const preferred=DF.Characters?.get?.(state.player.characterId)?.preferredWeapon;
+  if(preferred&&WEAPONS[preferred])this.select(preferred);
+  this.status()},
  hide(){this.on=false;$('picker').hidden=true},
  select(id){if(!this.on||this.locked)return;this.sel=id;[...$('pkGrid').children].forEach(c=>c.classList.toggle('sel',c.dataset.w===id));$('pkLock').disabled=false;SFX.init();SFX.ui()},
  lock(){if(!this.on||this.locked||!this.sel)return;this.locked=true;$('picker').classList.add('locked');$('pkLock').disabled=true;$('pkLock').textContent='LOCKED IN';this.status();Match.onMyPick(this.sel)},
@@ -196,7 +199,7 @@ const Match={
  onMyPick(id){if(this.mode==='guest')Net.send({t:'pick',n:this.round,w:id});else{this.picks[0]=id;if(this.mode==='host')Net.send({t:'lock'})}},
  setRemotePick(id){if(this.phase==='pick'&&WEAPONS[id]&&!this.picks[1]){this.picks[1]=id;Picker.setOpp(true)}},
  pickStep(dt){this.pickT-=dt;Picker.tick(this.pickT);
-  if(this.mode==='bot'&&!this.picks[1]){this.botWait-=dt;if(this.botWait<=0){this.picks[1]=this.rollWeapon();Picker.setOpp(true)}}
+  if(this.mode==='bot'&&!this.picks[1]){this.botWait-=dt;if(this.botWait<=0){const pref=DF.Characters?.get?.(this.p2.characterId)?.preferredWeapon;this.picks[1]=(pref&&WEAPONS[pref])?pref:this.rollWeapon();Picker.setOpp(true)}}
   if(this.pickT<=0&&!Picker.locked)Picker.autoLock();
   if(this.mode!=='guest'&&((this.picks[0]&&this.picks[1])||this.pickT<=-1.2))this.resolvePick()},
  resolvePick(){const a=this.picks[0]||this.rollWeapon(),b=this.picks[1]||this.rollWeapon();this.applyRound(a,b);

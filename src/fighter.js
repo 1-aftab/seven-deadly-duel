@@ -25,11 +25,11 @@ function ik(sx,sy,tx,ty,a,b,out){let dx=tx-sx,dy=ty-sy,d=Math.hypot(dx,dy);const
 
 class Fighter{
  constructor(side,name){this.side=side;this.name=name;this.characterId=(DF.Characters&&DF.Characters.list[side?1:0]||DF.Characters?.get?.('shadow'))?.id||'shadow';this.pal=PAL[side];this.pose=mk();this.tgt=mk();this.rig={};this.ik={};
-  this.input={left:false,right:false,jump:0,attack:0,dash:0,heavy:0,step:0};this.stepSeen=0;this.atkCd=0;this.hvCd=0;this.trail=[];this.ghosts=[];this.cape={x:-26,y:46};this.weapon=DF.WEAPONS.sword;this.reset(300,1,this.weapon)}
- setCharacter(id){if(DF.Characters&&DF.Characters.valid(id))this.characterId=id;return this.characterId}
+  this.input={left:false,right:false,jump:0,attack:0,dash:0,heavy:0,step:0,block:false};this.stepSeen=0;this.atkCd=0;this.hvCd=0;this.trail=[];this.ghosts=[];this.cape={x:-26,y:46};this.weapon=DF.WEAPONS.sword;this.animFrame=0;this.reset(300,1,this.weapon)}
+ setCharacter(id){if(DF.Characters&&DF.Characters.valid(id)){this.characterId=id;const ch=DF.Characters.get(id);this.preferredWeapon=ch&&DF.WEAPONS?.[ch.preferredWeapon]?ch.preferredWeapon:'sword';}return this.characterId}
  reset(x,face,weapon){this.x=x;this.y=GROUND;this.vx=0;this.vy=0;this.facing=face;this.grounded=true;this.hp=100;this.mode='intro';this.modeT=0;this.atk=null;this.prevSeg=null;
   this.dashCd=0;this.atkCd=0;this.hvCd=3.5;this.powerCd=0;this.powerT=0;this.powerKind='';this.inv=0;this.flash=0;this.landT=0;this.walkPh=0;this.animT=Math.random()*5;this.rot=0;this.yOff=0;this.shakeT=0;this.hipY=-56;this.hurtDur=.3;this.dashDir=1;this.ghostT=0;
-  this.trail.length=0;this.ghosts.length=0;this.weapon=weapon;this.input.left=this.input.right=false;this.input.jump=this.input.attack=this.input.dash=this.input.heavy=0;this.input.step=0;this.stepSeen=0;
+  this.trail.length=0;this.ghosts.length=0;this.weapon=weapon||DF.WEAPONS[this.preferredWeapon]||DF.WEAPONS.sword;this.input.left=this.input.right=false;this.input.jump=this.input.attack=this.input.dash=this.input.heavy=0;this.input.step=0;this.stepSeen=0;
   Object.assign(this.pose,DF.READY);this.rig={};this.computeRig(1)}
  setMode(m){this.mode=m;this.modeT=0}
  get alive(){return this.hp>0}
@@ -167,73 +167,32 @@ startPower(G,pow){this.input.heavy=0;const st=pow.stats||{},type=st.type||'';thi
   c.globalAlpha=1;c.globalCompositeOperation='source-over'}
  drawAnime(c){
   const ch=DF.Characters&&DF.Characters.get?DF.Characters.get(this.characterId):null;
-  const im=ch&&DF.Characters.images[this.characterId];
+  const atlas=ch&&DF.Characters.atlases&&DF.Characters.atlases[this.characterId];
+  const source=ch&&DF.Characters.images&&DF.Characters.images[this.characterId];
+  const useAtlas=!!(atlas&&atlas.complete&&atlas.naturalWidth);
+  const im=useAtlas?atlas:source;
   if(!ch||!im||!im.complete||!im.naturalWidth)return false;
-  const t=this.animT, m=this.mode;
-  let bob=Math.sin(t*2.4)*1.4, sx=1, sy=1, rot=0, ox=0, oy=0;
-  const moving=m==='free'&&Math.abs(this.vx)>14;
-  // Sprite presentation follows the same two-step cadence as the existing rig.
-  // The sprite is a full-body image, so we animate the whole pose with alternating
-  // heel/toe compression, bob, lean and a tiny stride offset instead of replacing
-  // the combat/physics rig.
+  const t=this.animT,m=this.mode,speed=clamp(Math.abs(this.vx)/WALK,0,1),moving=m==='free'&&Math.abs(this.vx)>14;
+  let frame=0,oy=0,ox=0,rot=0,sx=1,sy=1;
   if(moving){
-   const speed=clamp(Math.abs(this.vx)/WALK,0,1);
-   const ph=this.walkPh%(Math.PI*2);
-   const step=Math.sin(ph), step2=Math.sin(ph+Math.PI);
-   bob=Math.abs(step)*1.8*speed + Math.sin(ph*2)*.7*speed;
-   sx=1+Math.sin(ph*2)*.014*speed;
-   sy=1-Math.abs(step)*.012*speed;
-   rot=step*.028*speed;
-   ox=this.facing*step*2.5*speed;
-  }
-  if(m==='attack'&&this.atk){
-   const a=this.atk;
-   const p=a.phase===0?clamp(a.t/a.W,0,1):a.phase===1?clamp(a.t/a.S,0,1):1-clamp(a.t/a.R,0,1);
-   ox=this.facing*p*13;rot=this.facing*(a.phase===0?-0.025:a.phase===1?.055:-.025);sx=1+.035*p;sy=1-.025*p;
-  }
-  if(m==='hurt'){rot=-this.facing*.09;ox=-this.facing*5}
-  if(m==='dash'){ox=this.dashDir*10;sy=.97;sx=1.06;rot=this.dashDir*.045}
-  if(!this.grounded&&m!=='ko'){oy=6;rot=this.facing*.035}
-  if(m==='ko'){rot=this.facing*.65;oy=30;sx=1.08;sy=.72}
-  if(m==='win'){bob=Math.sin(t*3)*3;sy=1.03}
-  const H=190,W=104;
-
-  c.save();c.translate(ox,oy+bob);c.rotate(rot);c.scale(sx,sy);
-  c.globalAlpha=this.flash>0?.72:1;
-  c.globalCompositeOperation='source-over';
-  c.drawImage(im,-W/2,-H,W,H);
-  c.globalAlpha=1;
-
-  const w=this.weapon;
-  let weaponAngle=-0.72,weaponX=18,weaponY=-92,glow=0;
-  if(m==='attack'&&this.atk){
-   const a=this.atk;
-   const p=a.phase===0?clamp(a.t/a.W,0,1):a.phase===1?clamp(a.t/a.S,0,1):1-clamp(a.t/a.R,0,1);
-   if(a.phase===0){weaponAngle=-1.65+1.0*p;weaponX=12+10*p;weaponY=-91+4*p}
-   else if(a.phase===1){weaponAngle=.95-2.25*p;weaponX=22+10*p;weaponY=-91-5*p;glow=.9}
-   else {weaponAngle=-1.25+.5*p;weaponX=17;weaponY=-91;glow=.25}
-   if(a.heavy)glow=1;
-  }else if(m==='hurt'){weaponAngle=-1;weaponX=14;weaponY=-89}
-  else if(m==='dash'){weaponAngle=-.95;weaponX=15;weaponY=-91}
-  else if(!this.grounded){weaponAngle=-1.05;weaponX=16;weaponY=-90}
-  else if(m==='ko'){weaponAngle=.7;weaponX=10;weaponY=-72}
-  else if(m==='win'){weaponAngle=-1.35;weaponX=18;weaponY=-92}
-
-  const skin=this.mods&&this.mods.weaponSkin&&this.mods.weaponSkin.stats&&this.mods.weaponSkin.stats.accent||palAccent(this.pal);
-  c.save();c.translate(weaponX,weaponY);c.rotate(weaponAngle);c.globalCompositeOperation='source-over';
-  DF.drawWeapon(c,w.id,skin,glow);c.restore();
-
-  if(m==='attack'&&this.atk&&this.atk.phase===1){
-   const p=clamp(this.atk.t/this.atk.S,0,1);
-   c.save();c.globalCompositeOperation='lighter';c.globalAlpha=.18+.42*Math.sin(Math.PI*p);
-   c.strokeStyle=ch.color||this.pal.accent;c.lineWidth=this.atk.heavy?7:4;
-   c.beginPath();c.arc(23,-91,42,-1.45+.35*p,.55+1.0*p);c.stroke();
-   c.globalAlpha=.75*Math.sin(Math.PI*p);c.strokeStyle='#fff';c.lineWidth=1.5;
-   c.beginPath();c.arc(23,-91,44,-1.4+.35*p,.5+1.0*p);c.stroke();c.restore();
-  }
-  c.globalCompositeOperation='lighter';c.globalAlpha=.045;c.fillStyle=ch.color;
-  c.beginPath();c.ellipse(0,-92,34,88,0,0,6.283);c.fill();
-  c.globalAlpha=1;c.globalCompositeOperation='source-over';c.restore();
+   const ph=this.walkPh%(Math.PI*2),step=Math.sin(ph),stride=Math.cos(ph);
+   frame=4+(Math.floor(this.walkPh/(Math.PI/2))&3);ox=this.facing*stride*3.5*speed;oy=Math.abs(step)*2.5*speed;rot=step*.05*speed;sx=1+.02*Math.cos(ph*2)*speed;sy=1-.02*Math.abs(step)*speed;
+  }else if(m==='attack'&&this.atk){const a=this.atk,p=a.phase===0?clamp(a.t/a.W,0,1):a.phase===1?clamp(a.t/a.S,0,1):1-clamp(a.t/a.R,0,1);frame=8+Math.min(3,Math.floor(p*4));ox=this.facing*p*11;rot=this.facing*(a.phase===1?.07:-.03);sx=1+.045*p;sy=1-.025*p}
+  else if(m==='hurt'){frame=13;ox=-this.facing*6;rot=-this.facing*.11}
+  else if(m==='ko'||m==='lose'){frame=15;rot=this.facing*.72;sy=.72;oy=24}
+  else if(!this.grounded){frame=12;oy=5;rot=this.facing*.03}
+  else if(m==='dash'){frame=4+((Math.floor(t*18))&3);ox=this.dashDir*10;sx=1.06;sy=.95;rot=this.dashDir*.04}
+  else if(m==='win'){frame=Math.floor(t*5)&3;sy=1.03}
+  else if(this.input.block){frame=14}
+  else frame=Math.floor(t*4)&3;
+  this.animFrame=frame;
+  const row=Math.floor(frame/4),col=frame&3,fw=120,fh=220,W=104,H=190;
+  c.save();c.translate(ox,oy);c.rotate(rot);c.scale(sx,sy);c.globalAlpha=1;c.globalCompositeOperation='source-over';if(useAtlas)c.drawImage(im,col*fw,row*fh,fw,fh,-W/2,-H,W,H);else c.drawImage(im,-W/2,-H,W,H);c.restore();
+  const anchor=ch.anchor||{x:18,y:-94};let weaponAngle=-.72,weaponX=anchor.x,weaponY=anchor.y,glow=0;
+  if(m==='attack'&&this.atk){const a=this.atk,p=a.phase===0?clamp(a.t/a.W,0,1):a.phase===1?clamp(a.t/a.S,0,1):1-clamp(a.t/a.R,0,1);if(a.phase===0){weaponAngle=-1.55+1*p;weaponX=anchor.x+5*p;weaponY=anchor.y+4*p}else if(a.phase===1){weaponAngle=.9-2.3*p;weaponX=anchor.x+7*p;weaponY=anchor.y-5*p;glow=a.heavy?1:.85}else{weaponAngle=-1.15+.4*p;glow=.2}if(a.heavy)glow=1}
+  else if(m==='hurt'){weaponAngle=-1;weaponX=anchor.x-3;weaponY=anchor.y+4}else if(m==='dash'){weaponAngle=-.95}else if(!this.grounded){weaponAngle=-1.05;weaponX-=2;weaponY-=2}else if(m==='ko'||m==='lose'){weaponAngle=.7;weaponX-=6;weaponY+=20}
+  const skin=ch.color||palAccent(this.pal);c.save();c.translate(weaponX,weaponY);c.rotate(weaponAngle);c.globalCompositeOperation='source-over';DF.drawWeapon(c,this.weapon.id,skin,glow);c.restore();
+  if(m==='attack'&&this.atk&&this.atk.phase===1){const p=clamp(this.atk.t/this.atk.S,0,1);c.save();c.globalCompositeOperation='lighter';c.globalAlpha=.16+.44*Math.sin(Math.PI*p);c.strokeStyle=ch.color||this.pal.accent;c.lineWidth=this.atk.heavy?7:4;c.beginPath();c.arc(anchor.x,anchor.y,42,-1.45+.35*p,.55+1*p);c.stroke();c.globalAlpha=.7*Math.sin(Math.PI*p);c.strokeStyle='#fff';c.lineWidth=1.5;c.beginPath();c.arc(anchor.x,anchor.y,44,-1.4+.35*p,.5+1*p);c.stroke();c.restore()}
   return true;
  }
 
