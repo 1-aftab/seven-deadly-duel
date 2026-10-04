@@ -8,22 +8,21 @@ const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>'
 
 /* ================= profile / leaderboard (kept from MVP, now persisted) ================= */
 const KEY='duelforge.v3';
-const state={player:{name:'',mpWins:0,mpLosses:0,botWins:0,coins:500,characterId:null},muted:false,gfx:'auto',
+const state={player:{name:'',mpWins:0,mpLosses:0,botWins:0,coins:500},muted:false,gfx:'auto',
  /* placeholder champions — a real shared board needs a server. Ranking = multiplayer duels only. */
  board:[]};
 try{let s=JSON.parse(localStorage.getItem(KEY)||'null');
  if(s){Object.assign(state.player,s.player||{});state.muted=!!s.muted;if(s.gfx==='low')state.gfx='low'}
  else{const o=JSON.parse(localStorage.getItem('duelforge.v2')||'null');if(o&&o.player){state.player.wins=o.player.wins|0;state.player.coins=o.player.coins|0||500}}}catch(e){}
-try{const c=localStorage.getItem('duelforge.character');if(DF.Characters?.valid(c))state.player.characterId=c}catch(e){}
 /* migrate: older versions counted every win (incl. bots) as 'wins' — those are practice wins now and never ranked */
 {const P=state.player;P.mpWins|=0;P.mpLosses|=0;P.botWins|=0;P.coins=Math.max(0,P.coins|0);P.xp=Math.max(0,P.xp|0);P.rank=Math.max(1,P.rank|0)}
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify({player:{name:state.player.name},muted:state.muted,gfx:state.gfx}))}catch(e){}};
- const syncCloud=()=>{const P=DF.Progression&&DF.Progression.state&&DF.Progression.state.profile;if(!P)return;state.player.name=P.display_name||state.player.name;state.player.coins=P.coins|0;state.player.xp=P.xp|0;state.player.rank=P.rank|0;state.player.mpWins=P.mp_wins|0;state.player.mpLosses=P.mp_losses|0;state.player.botWins=P.bot_wins|0;if(P.settings&&typeof P.settings==='object'){if(DF.Characters?.valid(P.settings.character_id))state.player.characterId=P.settings.character_id;}if(P.settings&&typeof P.settings==='object'){if(typeof P.settings.sound==='boolean')state.muted=!P.settings.sound;if(P.settings.gfx==='low'||P.settings.gfx==='auto')state.gfx=P.settings.gfx;SFX.muted=state.muted;} };
+ const syncCloud=()=>{const P=DF.Progression&&DF.Progression.state&&DF.Progression.state.profile;if(!P)return;state.player.name=P.display_name||state.player.name;state.player.coins=P.coins|0;state.player.xp=P.xp|0;state.player.rank=P.rank|0;state.player.mpWins=P.mp_wins|0;state.player.mpLosses=P.mp_losses|0;state.player.botWins=P.bot_wins|0;if(P.settings&&typeof P.settings==='object'){if(typeof P.settings.sound==='boolean')state.muted=!P.settings.sound;if(P.settings.gfx==='low'||P.settings.gfx==='auto')state.gfx=P.settings.gfx;SFX.muted=state.muted;} };
 SFX.muted=state.muted;
 DF.Progression&&(DF.Progression.onChange=()=>{syncCloud();updateHome();if(cur==='settings')updateSettings()});
 const ico=(n,c)=>'<svg class="i '+(c||'')+'" aria-hidden="true"><use href="#i-'+n+'"/></svg>';
 
-const screens=['splash','authScreen','nameScreen','characterScreen','home','mp','room','leaderboard','settings','store','profile','friends','duel','result'];
+const screens=['splash','authScreen','nameScreen','home','mp','room','leaderboard','settings','store','profile','friends','duel','result'];
 let cur='splash';
 function show(id){cur=id;screens.forEach(s=>$(s).classList.toggle('active',s===id));document.body.classList.toggle('in-duel',id==='duel');
  if(id==='home')updateHome();if(id==='leaderboard')renderBoard();if(id==='settings')updateSettings();if(id!=='duel'){Match.active=false}window.scrollTo(0,0)}
@@ -31,24 +30,6 @@ DF.show=show;
 const W=x=>x.mp_wins|0,Lo=x=>x.mp_losses|0;
 function ranked(){const rows=[...state.board];const seen=new Set(),out=[];for(const x of rows){const key=x.id||String(x.name||'').toUpperCase();if(seen.has(key))continue;seen.add(key);out.push(x)}const meId=DF.Progression?.state?.profile?.id;if(meId&&!seen.has(meId))out.push({id:meId,name:state.player.name,mp_wins:state.player.mpWins,mp_losses:state.player.mpLosses});return out.sort((a,b)=>W(b)-W(a)||Lo(a)-Lo(b)||String(a.name||'').localeCompare(String(b.name||'')))}
 const myRank=()=>{const id=DF.Progression?.state?.profile?.id;const all=ranked();const i=id?all.findIndex(x=>x.id===id):all.findIndex(x=>String(x.name).toUpperCase()===String(state.player.name).toUpperCase());return i<0?0:i+1};
-function renderCharacters(){
- const grid=$('charGrid'),detail=$('charDetail');if(!grid||!DF.Characters)return;const current=state.player.characterId||DF.Characters.default;
- grid.innerHTML=DF.Characters.list.map(c=>`<button type="button" class="char-card ${c.id===current?'selected':''}" data-char="${c.id}"><img src="${c.asset}" alt="${escapeHtml(c.name)}"><span class="cn"><b>${escapeHtml(c.name)}</b><i class="dot" style="color:${c.color};background:${c.color}"></i></span><small>${escapeHtml(c.title)}</small></button>`).join('');
- grid.querySelectorAll('[data-char]').forEach(b=>b.onclick=()=>previewCharacter(b.dataset.char));previewCharacter(current);
-}
-function previewCharacter(id){
- if(!DF.Characters?.valid(id))return;const c=DF.Characters.get(id),detail=$('charDetail');if(!detail)return;state.player.characterId=id;
- const bar=(n,v)=>`<span>${n}</span><i style="--v:${v}% ;color:${c.color}"></i>`;
- detail.innerHTML=`<img src="${c.asset}" alt="${escapeHtml(c.name)}"><div><h3>${escapeHtml(c.name)} · ${escapeHtml(c.title)}</h3><p>${escapeHtml(c.desc)}</p><div class="char-bars">${bar('ATTACK',c.stats.attack)}${bar('DEFENSE',c.stats.defense)}${bar('SPEED',c.stats.speed)}${bar('SPECIAL',c.stats.special)}</div></div><button class="primary" id="charConfirm">${id===DF.Characters.selected()?'SELECTED':'SELECT FIGHTER'}</button>`;
- detail.querySelector('#charConfirm').onclick=()=>saveCharacter(id);document.querySelectorAll('.char-card').forEach(x=>x.classList.toggle('selected',x.dataset.char===id));
-}
-async function saveCharacter(id){
- const old=state.player.characterId;state.player.characterId=id;try{localStorage.setItem('duelforge.character',id)}catch(e){}
- try{if(DF.Progression?.ready?.())await DF.Progression.setCharacter(id);else if(DF.Progression?.state?.profile)DF.Progression.state.profile.settings=Object.assign({},DF.Progression.state.profile.settings||{},{character_id:id});show('home')}catch(e){state.player.characterId=old;const m=$('nameErr');if(m)m.textContent=e.message||'Could not save character.';return}
- updateHome();show('home');
-}
-function openCharacters(){renderCharacters();show('characterScreen')}
-
 function updateHome(){const r=myRank();$('homeWins').textContent=state.player.mpWins;$('homeCoins').textContent=state.player.coins.toLocaleString();$('homeRank').textContent=r?'#'+r:'—';$('playerName').textContent=state.player.name||'PLAYER';$('avatar').textContent=(state.player.name||'?')[0];$('muteBtn').innerHTML=ico(state.muted?'mute':'vol');if(DF.Progression?.ready?.()&&cur==='home')DF.Progression.leaderboard().then(rows=>{state.board=(rows||[]).map(x=>({id:x.id,name:x.display_name,mp_wins:x.mp_wins|0,mp_losses:x.mp_losses|0,rank:x.rank|0}));if(cur==='home')$('homeRank').textContent=myRank()?'#'+myRank():'—'}).catch(()=>{})}
 async function renderBoard(){
   const note=$('boardNote');
@@ -82,22 +63,14 @@ addEventListener('keydown',e=>{if(!Match.active)return;const k=KEYMAP[e.key.toLo
 addEventListener('keyup',e=>{const k=KEYMAP[e.key.toLowerCase()];if(k==='L'||k==='R'){held[k]=false;Input.dir(held.L,held.R)}});
 addEventListener('blur',()=>{held.L=held.R=false;Input.clear()});
 (function touch(){
- const dpad=$('dpad');let ptr=null;let touchDir=null;
- const setTouchDir=k=>{touchDir=k;Input.dir(k==='L',k==='R');Input.tapDir(k);SFX.init();SFX.resume()};
- const clearTouch=()=>{touchDir=null;Input.dir(held.L,held.R)};
- [['leftBtn','L'],['rightBtn','R']].forEach(([id,k])=>{
-  const b=$(id);
-  b.style.pointerEvents='auto';
-  b.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();ptr=e.pointerId;try{b.setPointerCapture(ptr)}catch(x){}b.classList.add('on');setTouchDir(k)});
-  const move=e=>{if(e.pointerId!==ptr)return;e.preventDefault();setTouchDir(k)};
-  b.addEventListener('pointermove',move);
-  const up=e=>{if(e.pointerId!==ptr)return;ptr=null;b.classList.remove('on');clearTouch()};
-  b.addEventListener('pointerup',up);b.addEventListener('pointercancel',up);b.addEventListener('lostpointercapture',up);
- });
+ const dpad=$('dpad');let ptr=null;
+ const upd=e=>{const r=dpad.getBoundingClientRect(),x=e.clientX-r.left;const l=x<r.width*.5;Input.dir(l,!l)};
+ dpad.addEventListener('pointerdown',e=>{e.preventDefault();ptr=e.pointerId;try{dpad.setPointerCapture(ptr)}catch(x){}upd(e);const side=e.clientX<dpad.getBoundingClientRect().left+dpad.getBoundingClientRect().width*.5?'L':'R';Input.tapDir(side);SFX.init();SFX.resume()});
+ dpad.addEventListener('pointermove',e=>{if(e.pointerId===ptr)upd(e)});
+ const up=e=>{if(e.pointerId===ptr){ptr=null;Input.dir(held.L,held.R)}};dpad.addEventListener('pointerup',up);dpad.addEventListener('pointercancel',up);
  [['attackBtn','a'],['heavyBtn','h'],['jumpBtn','j'],['dashBtn','d']].forEach(([id,k])=>{const b=$(id);
   b.addEventListener('pointerdown',e=>{e.preventDefault();b.classList.add('down');Input.press(k)});
-  const off=()=>b.classList.remove('down');b.addEventListener('pointerup',off);b.addEventListener('pointercancel',off);b.addEventListener('pointerleave',off);
- });
+  const off=()=>b.classList.remove('down');b.addEventListener('pointerup',off);b.addEventListener('pointercancel',off);b.addEventListener('pointerleave',off)});
  const duel=$('duel');duel.addEventListener('touchmove',e=>e.preventDefault(),{passive:false});duel.addEventListener('touchstart',e=>{if(!e.target.closest('#pauseMenu,#picker'))e.preventDefault()},{passive:false});
  duel.addEventListener('contextmenu',e=>e.preventDefault());document.addEventListener('gesturestart',e=>e.preventDefault());
  const coarse=matchMedia('(pointer:coarse)').matches||navigator.maxTouchPoints>0||'ontouchstart' in window;document.body.classList.toggle('touch',coarse);
@@ -160,10 +133,7 @@ const Picker={built:false,on:false,sel:null,locked:false,opp:false,tShown:-1,
  show(round,foe){this.build();this.on=true;this.sel=null;this.locked=false;this.opp=false;this.tShown=-1;
   $('picker').hidden=false;$('picker').classList.remove('locked');$('pkSub').textContent='ROUND '+round+' \u00b7 vs '+foe;
   $('pkLock').disabled=true;$('pkLock').textContent='LOCK IN';
-  [...$('pkGrid').children].forEach(c=>c.classList.remove('sel'));
-  const preferred=DF.Characters?.get?.(state.player.characterId)?.preferredWeapon;
-  if(preferred&&WEAPONS[preferred])this.select(preferred);
-  this.status()},
+  [...$('pkGrid').children].forEach(c=>c.classList.remove('sel'));this.status()},
  hide(){this.on=false;$('picker').hidden=true},
  select(id){if(!this.on||this.locked)return;this.sel=id;[...$('pkGrid').children].forEach(c=>c.classList.toggle('sel',c.dataset.w===id));$('pkLock').disabled=false;SFX.init();SFX.ui()},
  lock(){if(!this.on||this.locked||!this.sel)return;this.locked=true;$('picker').classList.add('locked');$('pkLock').disabled=true;$('pkLock').textContent='LOCKED IN';this.status();Match.onMyPick(this.sel)},
@@ -179,7 +149,7 @@ addEventListener('keydown',e=>{if(!Picker.on||!Match.active||Match.paused)return
 const Match={
  active:false,mode:'bot',me:0,matchId:null,phase:'none',phaseT:0,round:1,score:[0,0],rand:null,picks:[null,null],pickT:0,botWait:0,names:['AFTAB','ASHEN WARDEN'],
  p1:new DF.Fighter(0,'P1'),p2:new DF.Fighter(1,'P2'),bot:null,timeLeft:60,hitstop:0,slow:0,paused:false,netT:0,inT:0,lastIn:'',remote:{l:0,r:0,j:0,a:0,d:0,h:0},seen:[[0,0,0,0,0],[0,0,0,0,0]],ended:false,koShown:false,
- start(o){this.mode=o.mode;this.me=o.mode==='guest'?1:0;this.matchId=o.matchId||((crypto&&crypto.randomUUID)?crypto.randomUUID():'m_'+Date.now()+'_'+Math.random().toString(36).slice(2));this.names=o.names;this.p1.name=o.names[0];this.p2.name=o.names[1];this.p1.setCharacter(o.characters?.[0]||state.player.characterId||'shadow');this.p2.setCharacter(o.characters?.[1]||DF.Characters?.random?.(this.p1.characterId)||'frost');const localMods=DF.Progression?DF.Progression.combat():{};this.p1.mods=this.me===0?localMods:(this.p1.mods||{});this.p2.mods=this.me===1?localMods:(this.p2.mods||{});
+ start(o){this.mode=o.mode;this.me=o.mode==='guest'?1:0;this.matchId=o.matchId||((crypto&&crypto.randomUUID)?crypto.randomUUID():'m_'+Date.now()+'_'+Math.random().toString(36).slice(2));this.names=o.names;this.p1.name=o.names[0];this.p2.name=o.names[1];const localMods=DF.Progression?DF.Progression.combat():{};this.p1.mods=this.me===0?localMods:(this.p1.mods||{});this.p2.mods=this.me===1?localMods:(this.p2.mods||{});
   let s=(o.seed>>>0)||1;this.rand=()=>{s=(s+0x6D2B79F5)|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
   Picker.hide();Input.step=0;this.score=[0,0];this.round=1;this.picks=[null,null];this.bot=o.mode==='bot'?new DF.Bot(1):null;this.paused=false;this.ended=false;this.remote={l:0,r:0,j:0,a:0,d:0,h:0,st:0};this.seen=[[0,0,0,0,0],[0,0,0,0,0]];
   this.hitstop=0;this.slow=0;cam.z=1;FX.reset();qual=Math.max(qual,baseQual());applyGfx();$('pauseMenu').hidden=true;
@@ -199,7 +169,7 @@ const Match={
  onMyPick(id){if(this.mode==='guest')Net.send({t:'pick',n:this.round,w:id});else{this.picks[0]=id;if(this.mode==='host')Net.send({t:'lock'})}},
  setRemotePick(id){if(this.phase==='pick'&&WEAPONS[id]&&!this.picks[1]){this.picks[1]=id;Picker.setOpp(true)}},
  pickStep(dt){this.pickT-=dt;Picker.tick(this.pickT);
-  if(this.mode==='bot'&&!this.picks[1]){this.botWait-=dt;if(this.botWait<=0){const pref=DF.Characters?.get?.(this.p2.characterId)?.preferredWeapon;this.picks[1]=(pref&&WEAPONS[pref])?pref:this.rollWeapon();Picker.setOpp(true)}}
+  if(this.mode==='bot'&&!this.picks[1]){this.botWait-=dt;if(this.botWait<=0){this.picks[1]=this.rollWeapon();Picker.setOpp(true)}}
   if(this.pickT<=0&&!Picker.locked)Picker.autoLock();
   if(this.mode!=='guest'&&((this.picks[0]&&this.picks[1])||this.pickT<=-1.2))this.resolvePick()},
  resolvePick(){const a=this.picks[0]||this.rollWeapon(),b=this.picks[1]||this.rollWeapon();this.applyRound(a,b);
@@ -320,10 +290,8 @@ onPower(f,type,st){
 /* ================= wiring ================= */
 const pick=a=>a[(Math.random()*a.length)|0];
 const botNames=['ASHEN WARDEN','GRAVE KNIGHT','EMBER CHAMPION','BLACK MARSHAL','PLAGUE LORD','HOLLOW SENTINEL'];
-function startBot(){Match.start({mode:'bot',names:[state.player.name,pick(botNames)],characters:[state.player.characterId,DF.Characters?.random?.(state.player.characterId)||'frost'],seed:(Math.random()*1e9)|0})}
+function startBot(){Match.start({mode:'bot',names:[state.player.name,pick(botNames)],seed:(Math.random()*1e9)|0})}
 $('botBtn').onclick=startBot;
-$('charactersBtn').onclick=openCharacters;
-$('charBack').onclick=()=>show('home');
 $('mpBtn').onclick=()=>{mpMsg('');busy(false);show('mp')};
 $('leaderBtn').onclick=()=>show('leaderboard');
 $('settingsBtn').onclick=()=>show('settings');
@@ -331,7 +299,7 @@ document.querySelectorAll('[data-home]').forEach(b=>b.onclick=()=>show('home'));
 $('resultHome').onclick=()=>{if(Match.mode!=='bot'){Net.send({t:'quit'});Net.close()}show('home')};
 $('rematchBtn').onclick=()=>{if(Match.mode==='bot'){startBot();return}
  const f=Match.rematchFlags;f.me=true;Net.send({t:'rematch'});$('rematchBtn').textContent='WAITING FOR OPPONENT…';tryRematch()};
-function tryRematch(){const f=Match.rematchFlags;if(Match.mode==='host'&&f&&f.me&&f.opp){Match.rematchFlags={me:false,opp:false};const seed=(Math.random()*1e9)|0,matchId=((crypto&&crypto.randomUUID)?crypto.randomUUID():'m_'+Date.now());Net.send({t:'start',names:Match.names,characters:[state.player.characterId,Match.p2.characterId],seed,matchId});Match.start({mode:'host',names:Match.names,characters:[state.player.characterId,Match.p2.characterId],seed,matchId})}}
+function tryRematch(){const f=Match.rematchFlags;if(Match.mode==='host'&&f&&f.me&&f.opp){Match.rematchFlags={me:false,opp:false};const seed=(Math.random()*1e9)|0,matchId=((crypto&&crypto.randomUUID)?crypto.randomUUID():'m_'+Date.now());Net.send({t:'start',names:Match.names,seed,matchId});Match.start({mode:'host',names:Match.names,seed,matchId})}}
 $('pauseBtn').onclick=()=>{SFX.ui();Match.pause(true)};
 $('resumeBtn').onclick=()=>Match.pause(false);
 $('quitDuel').onclick=()=>Match.quit();
@@ -349,7 +317,7 @@ $('setRename').onclick=()=>openName(true);
 const TAG1=['ASH','GRIM','IRON','EMBER','DUSK','RAVEN','BLACK','THORN','CRYPT','BLOOD'],TAG2=['KNIGHT','WARDEN','BLADE','REAVER','MARSHAL','SLAYER','WOLF','LORD'];
 const cleanName=s=>String(s||'').replace(/[^\w\- ]/g,'').replace(/\s+/g,' ').trim().slice(0,14).toUpperCase();
 function openName(canCancel){$('nameIn').value=state.player.name;$('nameErr').textContent='';$('nameCancel').hidden=!canCancel;show('nameScreen');setTimeout(()=>{try{$('nameIn').focus()}catch(e){}},60)}
-async function submitName(){const n=cleanName($('nameIn').value);if(n.length<2){$('nameErr').textContent='Use at least 2 letters or numbers.';return}state.player.name=n;save();try{if(DF.Progression)await DF.Progression.setName(n)}catch(e){$('nameErr').textContent=e.message||'Could not save name.';return}openCharacters()}
+async function submitName(){const n=cleanName($('nameIn').value);if(n.length<2){$('nameErr').textContent='Use at least 2 letters or numbers.';return}state.player.name=n;save();try{if(DF.Progression)await DF.Progression.setName(n)}catch(e){$('nameErr').textContent=e.message||'Could not save name.';return}show('home')}
 $('nameOk').onclick=submitName;$('nameCancel').onclick=()=>show('home');$('namePill').onclick=()=>openName(true);
 $('nameIn').onkeydown=e=>{if(e.key==='Enter')submitName()};$('nameIn').oninput=()=>{$('nameErr').textContent=''};
 $('diceBtn').onclick=()=>{$('nameIn').value=(pick(TAG1)+pick(TAG2)+(10+((Math.random()*90)|0))).slice(0,14);$('nameErr').textContent=''};
@@ -374,7 +342,7 @@ async function continueAfterAuth(){
       if(DF.Progression)await DF.Progression.load();
       syncCloud();
       if(state.player.name)
-        {if(!DF.Characters?.valid(state.player.characterId))openCharacters();else show('home');}
+        show('home');
       else
         openName(false);
 
@@ -429,12 +397,12 @@ $('splash').addEventListener(
 window.DuelForgeAuthReady=async function(){
   try{if(DF.Progression)await DF.Progression.load()}catch(e){}
   syncCloud();
-  if(state.player.name){if(!DF.Characters?.valid(state.player.characterId))openCharacters();else show('home')}
+  if(state.player.name)show('home');
   else openName(false);
 };
 
 /* ================= multiplayer: 4-digit room codes ================= */
-let remoteName='OPPONENT',remoteCharacter='frost',roomT=0,roomBtns={};
+let remoteName='OPPONENT',roomT=0,roomBtns={};
 function mpMsg(t,bad){const e=$('mpMsg');e.textContent=t;e.classList.toggle('bad',!!bad)}
 function roomMsg(t,wait){const e=$('roomMsg');e.textContent=t;e.classList.toggle('wait',!!wait)}
 function busy(on){$('mkRoom').disabled=on;$('joinBtn').disabled=on}
@@ -445,7 +413,7 @@ function showRoom(code,host){[...$('roomCode').children].forEach((el,k)=>el.text
  show('room')}
 function wireNet(){
  Net.onjoining=()=>{if(cur==='room')roomMsg('Opponent is joining',true)};
- Net.onopen=()=>{busy(false);Net.send({t:'hello',name:state.player.name,character:state.player.characterId,mods:DF.Progression?DF.Progression.combat():{}});if(Net.role==='guest')showRoom(Net.code,false)};
+ Net.onopen=()=>{busy(false);Net.send({t:'hello',name:state.player.name,mods:DF.Progression?DF.Progression.combat():{}});if(Net.role==='guest')showRoom(Net.code,false)};
  Net.onclose=()=>{
   if(Match.active&&Match.mode!=='bot'){banner('OPPONENT LEFT','','end');setTimeout(()=>{Match.active=false;Net.close();show('home')},1800)}
   else if(cur==='room')leftRoom();
@@ -472,11 +440,11 @@ DF.hostRoomForFriend=async friendId=>{if(!DF.Net?.supported())throw Error('Onlin
 DF.joinRoomFromFriend=async code=>{if(!DF.Net?.supported())throw Error('Online play is not supported in this browser.');wireNet();busy(true);await Net.join(String(code));busy(false);showRoom(String(code),false);show('room')};
 function onNet(m){
  switch(m.t){
-  case'hello':remoteName=String(m.name||'OPPONENT').slice(0,14);remoteCharacter=DF.Characters?.valid(m.character)?m.character:'frost';if(m.mods)Match.p2.mods=m.mods;
+  case'hello':remoteName=String(m.name||'OPPONENT').slice(0,14);if(m.mods)Match.p2.mods=m.mods;
    if(Net.role==='host'){setSlot(2,remoteName,'GUEST',true);roomMsg('Opponent joined! Starting…',false);clearTimeout(roomT);
-    roomT=setTimeout(()=>{if(!Net.open||cur!=='room')return;const seed=(Math.random()*1e9)|0,names=[state.player.name,remoteName],characters=[state.player.characterId,remoteCharacter];const matchId=((crypto&&crypto.randomUUID)?crypto.randomUUID():'m_'+Date.now()+'_'+Math.random().toString(36).slice(2));Net.send({t:'start',names,characters,seed,matchId});Match.start({mode:'host',names,characters,seed,matchId})},1800)}
+    roomT=setTimeout(()=>{if(!Net.open||cur!=='room')return;const seed=(Math.random()*1e9)|0,names=[state.player.name,remoteName];const matchId=((crypto&&crypto.randomUUID)?crypto.randomUUID():'m_'+Date.now()+'_'+Math.random().toString(36).slice(2));Net.send({t:'start',names,seed,matchId});Match.start({mode:'host',names,seed,matchId})},1800)}
    else{setSlot(1,remoteName,'HOST',true);roomMsg('Joined! The match starts in a moment',true)}break;
-  case'start':clearTimeout(roomT);Match.start({mode:'guest',names:m.names,characters:m.characters,seed:m.seed,matchId:m.matchId});break;
+  case'start':clearTimeout(roomT);Match.start({mode:'guest',names:m.names,seed:m.seed,matchId:m.matchId});break;
   case'in':if(Match.mode==='host')Match.remote={l:m.l,r:m.r,j:m.j,a:m.a,d:m.d,h:m.h|0,st:m.st|0};break;
   case'pstart':if(Match.mode==='guest'&&Match.active){Match.round=m.n;Match.score=m.sc;Match.picks=[null,null];Match.enterPick()}break;
   case'pick':if(Match.mode==='host'&&m.n===Match.round)Match.setRemotePick(m.w);break;

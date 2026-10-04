@@ -17,19 +17,17 @@ const PAL=[
  {armor:'#3d2125',armor2:'#64363a',dark:'#1a0d0f',cloth:'#3a1218',cape:'#7d1620',trim:'#c9473c',metal:'#a89a94',accent:'#ff5a3c'}
 ];
 const PAL_FLASH={armor:'#ffffff',armor2:'#ffffff',dark:'#efe6d8',cloth:'#f6efe4',cape:'#faf4ea',trim:'#ffffff',metal:'#ffffff',accent:'#ffffff'};
-const palAccent=pal=>pal&&pal.accent||'#f0c660';
 
 function leg(t,k){const kx=Math.cos(t)*THIGH,ky=Math.sin(t)*THIGH,s=t+k;return{kx,ky,fx:kx+Math.cos(s)*SHIN,fy:ky+Math.sin(s)*SHIN}}
 function ik(sx,sy,tx,ty,a,b,out){let dx=tx-sx,dy=ty-sy,d=Math.hypot(dx,dy);const ang=Math.atan2(dy,dx);d=Math.min(d,a+b-.01);d=Math.max(d,Math.abs(a-b)+.01);
  const A=Math.acos(clamp((a*a+d*d-b*b)/(2*a*d),-1,1));out.ex=sx+Math.cos(ang+A)*a;out.ey=sy+Math.sin(ang+A)*a;out.hx=sx+Math.cos(ang)*d;out.hy=sy+Math.sin(ang)*d}
 
 class Fighter{
- constructor(side,name){this.side=side;this.name=name;this.characterId=(DF.Characters&&DF.Characters.list[side?1:0]||DF.Characters?.get?.('shadow'))?.id||'shadow';this.pal=PAL[side];this.pose=mk();this.tgt=mk();this.rig={};this.ik={};
-  this.input={left:false,right:false,jump:0,attack:0,dash:0,heavy:0,step:0,block:false};this.stepSeen=0;this.atkCd=0;this.hvCd=0;this.trail=[];this.ghosts=[];this.cape={x:-26,y:46};this.weapon=DF.WEAPONS.sword;this.animFrame=0;this.reset(300,1,this.weapon)}
- setCharacter(id){if(DF.Characters&&DF.Characters.valid(id)){this.characterId=id;const ch=DF.Characters.get(id);this.preferredWeapon=ch&&DF.WEAPONS?.[ch.preferredWeapon]?ch.preferredWeapon:'sword';}return this.characterId}
+ constructor(side,name){this.side=side;this.name=name;this.pal=PAL[side];this.pose=mk();this.tgt=mk();this.rig={};this.ik={};
+  this.input={left:false,right:false,jump:0,attack:0,dash:0,heavy:0,step:0};this.stepSeen=0;this.atkCd=0;this.hvCd=0;this.trail=[];this.ghosts=[];this.cape={x:-26,y:46};this.weapon=DF.WEAPONS.sword;this.reset(300,1,this.weapon)}
  reset(x,face,weapon){this.x=x;this.y=GROUND;this.vx=0;this.vy=0;this.facing=face;this.grounded=true;this.hp=100;this.mode='intro';this.modeT=0;this.atk=null;this.prevSeg=null;
   this.dashCd=0;this.atkCd=0;this.hvCd=3.5;this.powerCd=0;this.powerT=0;this.powerKind='';this.inv=0;this.flash=0;this.landT=0;this.walkPh=0;this.animT=Math.random()*5;this.rot=0;this.yOff=0;this.shakeT=0;this.hipY=-56;this.hurtDur=.3;this.dashDir=1;this.ghostT=0;
-  this.trail.length=0;this.ghosts.length=0;this.weapon=weapon||DF.WEAPONS[this.preferredWeapon]||DF.WEAPONS.sword;this.input.left=this.input.right=false;this.input.jump=this.input.attack=this.input.dash=this.input.heavy=0;this.input.step=0;this.stepSeen=0;
+  this.trail.length=0;this.ghosts.length=0;this.weapon=weapon;this.input.left=this.input.right=false;this.input.jump=this.input.attack=this.input.dash=this.input.heavy=0;this.input.step=0;this.stepSeen=0;
   Object.assign(this.pose,DF.READY);this.rig={};this.computeRig(1)}
  setMode(m){this.mode=m;this.modeT=0}
  get alive(){return this.hp>0}
@@ -39,11 +37,7 @@ class Fighter{
   this.dashCd=Math.max(0,this.dashCd-dt);this.atkCd=Math.max(0,this.atkCd-dt);this.hvCd=Math.max(0,this.hvCd-dt);this.powerCd=Math.max(0,this.powerCd-dt);this.powerT=Math.max(0,this.powerT-dt);this.inv=Math.max(0,this.inv-dt);this.flash-=dt;this.landT-=dt;this.shakeT-=dt;
   I.jump=Math.max(0,I.jump-dt);I.attack=Math.max(0,I.attack-dt);I.dash=Math.max(0,I.dash-dt);I.heavy=Math.max(0,I.heavy-dt);
   const dir=(I.right?1:0)-(I.left?1:0),mods=this.mods||{},armor=mods.armor||null,pow=mods.power||null,spd=WALK*w.speed*(1+(armor&&armor.stats.speed||0)+(pow&&pow.stats.speed||0)+(this.powerKind==='bloodrush'&&this.powerT>0?(pow&&pow.stats.speed||.28):0));
-  const faceOpp=()=>{
-   const dx=opp.x-this.x;
-   if(dir!==0)this.facing=dir;
-   else if(Math.abs(dx)>6)this.facing=dx>0?1:-1;
-  };
+  const faceOpp=()=>{const dx=opp.x-this.x;if(Math.abs(dx)>6)this.facing=dx>0?1:-1};
   const m=this.mode;
   if(m==='free'){
    faceOpp();
@@ -158,51 +152,20 @@ startPower(G,pow){this.input.heavy=0;const st=pow.stats||{},type=st.type||'';thi
  drawShadow(c){const h=clamp((GROUND-this.y)/160,0,1),rx=34*(1-h*.4),a=.5*(1-h*.6);if(this.mode==='ko'&&this.modeT>.2){}
   c.globalAlpha=a;c.fillStyle='#000';c.beginPath();c.ellipse(this.x,GROUND+5,rx,7*(1-h*.3),0,0,6.283);c.fill();
   c.globalCompositeOperation='lighter';c.globalAlpha=.12*(1-h);c.fillStyle=this.pal.accent;c.beginPath();c.ellipse(this.x,GROUND+5,rx*1.1,6,0,0,6.283);c.fill();c.globalCompositeOperation='source-over';c.globalAlpha=1}
- drawGhosts(c){const ch=DF.Characters&&DF.Characters.get?DF.Characters.get(this.characterId):null;const im=ch&&DF.Characters.images[this.characterId];if(!im||!im.complete)return;for(const g of this.ghosts){c.save();c.translate(g.x,g.y);c.scale(g.f*.42,.42);c.globalAlpha=Math.max(0,g.a)*.18;c.globalCompositeOperation='source-over';c.drawImage(im,-52,-190,104,190);c.restore()}c.globalAlpha=1;c.globalCompositeOperation='source-over'}
+ drawGhosts(c){for(const g of this.ghosts){c.globalAlpha=Math.max(0,g.a)*.45;c.fillStyle=this.pal.accent;c.save();c.translate(g.x,g.y);c.scale(g.f,1);
+   c.beginPath();c.ellipse(4,-70,12,30,.25,0,6.283);c.fill();c.beginPath();c.arc(10,-110,10,0,6.283);c.fill();c.restore()}c.globalAlpha=1}
  drawTrail(c){const T=this.trail;if(T.length<2)return;const w=this.weapon,N=4;c.globalCompositeOperation='lighter';c.lineJoin='round';const col=this.pal.accent,bx=[],by=[],tx=[],ty=[];
   for(let i=1;i<T.length;i++){const a=T[i-1],b=T[i],k=1-b.age/.17;if(k<=0)continue;let da=b.a-a.a;while(da>Math.PI)da-=6.2832;while(da<-Math.PI)da+=6.2832;
    for(let j=0;j<=N;j++){const u=j/N,an=a.a+da*u,gx=a.gx+(b.gx-a.gx)*u,gy=a.gy+(b.gy-a.gy)*u,cx=Math.cos(an),cy=Math.sin(an);bx[j]=gx+cx*w.seg0;by[j]=gy+cy*w.seg0;tx[j]=gx+cx*w.len;ty[j]=gy+cy*w.len}
    c.globalAlpha=k*.5;c.fillStyle=col;c.beginPath();c.moveTo(bx[0],by[0]);for(let j=1;j<=N;j++)c.lineTo(bx[j],by[j]);for(let j=N;j>=0;j--)c.lineTo(tx[j],ty[j]);c.closePath();c.fill();
    c.globalAlpha=k*.95;c.strokeStyle='#fff';c.lineWidth=2.4;c.beginPath();c.moveTo(tx[0],ty[0]);for(let j=1;j<=N;j++)c.lineTo(tx[j],ty[j]);c.stroke()}
   c.globalAlpha=1;c.globalCompositeOperation='source-over'}
- drawAnime(c){
-  const ch=DF.Characters&&DF.Characters.get?DF.Characters.get(this.characterId):null;
-  const atlas=ch&&DF.Characters.atlases&&DF.Characters.atlases[this.characterId];
-  const source=ch&&DF.Characters.images&&DF.Characters.images[this.characterId];
-  const useAtlas=!!(atlas&&atlas.complete&&atlas.naturalWidth);
-  const im=useAtlas?atlas:source;
-  if(!ch||!im||!im.complete||!im.naturalWidth)return false;
-  const t=this.animT,m=this.mode,speed=clamp(Math.abs(this.vx)/WALK,0,1),moving=m==='free'&&Math.abs(this.vx)>14;
-  let frame=0,oy=0,ox=0,rot=0,sx=1,sy=1;
-  if(moving){
-   const ph=this.walkPh%(Math.PI*2),step=Math.sin(ph),stride=Math.cos(ph);
-   frame=4+(Math.floor(this.walkPh/(Math.PI/2))&3);ox=this.facing*stride*3.5*speed;oy=Math.abs(step)*2.5*speed;rot=step*.05*speed;sx=1+.02*Math.cos(ph*2)*speed;sy=1-.02*Math.abs(step)*speed;
-  }else if(m==='attack'&&this.atk){const a=this.atk,p=a.phase===0?clamp(a.t/a.W,0,1):a.phase===1?clamp(a.t/a.S,0,1):1-clamp(a.t/a.R,0,1);frame=8+Math.min(3,Math.floor(p*4));ox=this.facing*p*11;rot=this.facing*(a.phase===1?.07:-.03);sx=1+.045*p;sy=1-.025*p}
-  else if(m==='hurt'){frame=13;ox=-this.facing*6;rot=-this.facing*.11}
-  else if(m==='ko'||m==='lose'){frame=15;rot=this.facing*.72;sy=.72;oy=24}
-  else if(!this.grounded){frame=12;oy=5;rot=this.facing*.03}
-  else if(m==='dash'){frame=4+((Math.floor(t*18))&3);ox=this.dashDir*10;sx=1.06;sy=.95;rot=this.dashDir*.04}
-  else if(m==='win'){frame=Math.floor(t*5)&3;sy=1.03}
-  else if(this.input.block){frame=14}
-  else frame=Math.floor(t*4)&3;
-  this.animFrame=frame;
-  const row=Math.floor(frame/4),col=frame&3,fw=120,fh=220,W=104,H=190;
-  c.save();c.translate(ox,oy);c.rotate(rot);c.scale(sx,sy);c.globalAlpha=1;c.globalCompositeOperation='source-over';if(useAtlas)c.drawImage(im,col*fw,row*fh,fw,fh,-W/2,-H,W,H);else c.drawImage(im,-W/2,-H,W,H);c.restore();
-  const anchor=ch.anchor||{x:18,y:-94};let weaponAngle=-.72,weaponX=anchor.x,weaponY=anchor.y,glow=0;
-  if(m==='attack'&&this.atk){const a=this.atk,p=a.phase===0?clamp(a.t/a.W,0,1):a.phase===1?clamp(a.t/a.S,0,1):1-clamp(a.t/a.R,0,1);if(a.phase===0){weaponAngle=-1.55+1*p;weaponX=anchor.x+5*p;weaponY=anchor.y+4*p}else if(a.phase===1){weaponAngle=.9-2.3*p;weaponX=anchor.x+7*p;weaponY=anchor.y-5*p;glow=a.heavy?1:.85}else{weaponAngle=-1.15+.4*p;glow=.2}if(a.heavy)glow=1}
-  else if(m==='hurt'){weaponAngle=-1;weaponX=anchor.x-3;weaponY=anchor.y+4}else if(m==='dash'){weaponAngle=-.95}else if(!this.grounded){weaponAngle=-1.05;weaponX-=2;weaponY-=2}else if(m==='ko'||m==='lose'){weaponAngle=.7;weaponX-=6;weaponY+=20}
-  const skin=ch.color||palAccent(this.pal);c.save();c.translate(weaponX,weaponY);c.rotate(weaponAngle);c.globalCompositeOperation='source-over';DF.drawWeapon(c,this.weapon.id,skin,glow);c.restore();
-  if(m==='attack'&&this.atk&&this.atk.phase===1){const p=clamp(this.atk.t/this.atk.S,0,1);c.save();c.globalCompositeOperation='lighter';c.globalAlpha=.16+.44*Math.sin(Math.PI*p);c.strokeStyle=ch.color||this.pal.accent;c.lineWidth=this.atk.heavy?7:4;c.beginPath();c.arc(anchor.x,anchor.y,42,-1.45+.35*p,.55+1*p);c.stroke();c.globalAlpha=.7*Math.sin(Math.PI*p);c.strokeStyle='#fff';c.lineWidth=1.5;c.beginPath();c.arc(anchor.x,anchor.y,44,-1.4+.35*p,.5+1*p);c.stroke();c.restore()}
-  return true;
- }
-
  draw(c){
   const R=this.rig,P=this.pose,pal=this.flash>0?PAL_FLASH:this.pal,w=this.weapon;
   const jx=this.shakeT>0?(Math.random()-.5)*5:0;
   c.save();c.translate(this.x+jx,this.y+this.yOff);c.scale(this.facing,1);
   if(this.rot){c.rotate(this.rot);c.translate(0,-7*Math.min(1,-this.rot))}
   c.lineCap='round';c.lineJoin='round';
-  if(this.drawAnime(c)){c.restore();return;}
   const chg=this.atk&&this.atk.heavy&&this.atk.phase===0;
   if(chg){const k=clamp(this.atk.t/this.atk.W,0,1);c.globalCompositeOperation='lighter';c.strokeStyle=this.pal.accent;c.fillStyle=this.pal.accent;
    c.globalAlpha=.12+.25*k;c.beginPath();c.arc(0,-62,34+14*k,0,6.283);c.fill();c.globalAlpha=.85*(1-k*.4);c.lineWidth=3;c.beginPath();c.arc(0,-62,82-48*k,0,6.283);c.stroke();
