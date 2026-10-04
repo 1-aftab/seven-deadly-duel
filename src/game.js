@@ -24,7 +24,7 @@ const ico=(n,c)=>'<svg class="i '+(c||'')+'" aria-hidden="true"><use href="#i-'+
 
 const screens=['splash','authScreen','nameScreen','home','mp','room','leaderboard','settings','store','profile','friends','duel','result'];
 let cur='splash';
-function show(id){cur=id;screens.forEach(s=>$(s).classList.toggle('active',s===id));document.body.classList.toggle('in-duel',id==='duel');
+function show(id){cur=id;screens.forEach(s=>$(s).classList.toggle('active',s===id));document.body.classList.toggle('in-duel',id==='duel');DF.Music&&DF.Music[id==='duel'?'start':'stop']();
  if(id==='home')updateHome();if(id==='leaderboard')renderBoard();if(id==='settings')updateSettings();if(id!=='duel'){Match.active=false}window.scrollTo(0,0)}
 DF.show=show;
 const W=x=>x.mp_wins|0,Lo=x=>x.mp_losses|0;
@@ -81,7 +81,7 @@ const canvas=$('game'),ctx=canvas.getContext('2d',{alpha:false});
 const lowEnd=(navigator.hardwareConcurrency||8)<=4||(navigator.deviceMemory||8)<=2;
 let view=null,cam={z:1},qual=0,ema=.0167,seen=0,autoLow=false,capMs=0;
 const baseQual=()=>state.gfx==='low'?2:lowEnd?1:0;
-function applyGfx(){const low=state.gfx==='low'||autoLow;FX.max=low?60:140;Arena.lite=low;capMs=state.gfx==='low'?33:0;document.body.classList.toggle('lowfx',low)}
+function applyGfx(){const low=state.gfx==='low'||autoLow;FX.max=low?60:state.gfx==='med'?100:state.gfx==='high'?220:140;document.body.dataset.gfx=state.gfx;Arena.lite=low;capMs=state.gfx==='low'?33:0;document.body.classList.toggle('lowfx',low)}
 function resize(){const cw=innerWidth,ch=innerHeight;if(!cw||!ch)return;let r=Math.min(devicePixelRatio||1,2)*Math.pow(.75,qual);const cap=(lowEnd||qual>=1)?960:1280;if(cw*r>cap)r=cap/cw;
  canvas.width=Math.max(2,Math.round(cw*r));canvas.height=Math.max(2,Math.round(ch*r));const S=Math.min(canvas.width/960,canvas.height/540);
  view={cw:canvas.width,ch:canvas.height,S,halfW:canvas.width/(2*S),halfH:canvas.height/(2*S)};Arena.build(view)}
@@ -96,7 +96,7 @@ function render(){
  p1.drawShadow(ctx);p2.drawShadow(ctx);p1.drawGhosts(ctx);p2.drawGhosts(ctx);
  const first=(p1.mode==='attack'||p1.mode==='win')?p2:p1,second=first===p1?p2:p1;
  first.draw(ctx);second.draw(ctx);first.drawTrail(ctx);second.drawTrail(ctx);
- FX.draw(ctx);Arena.drawFront(ctx,par);
+ DF.Ov&&DF.Ov.draw(ctx);FX.draw(ctx);Arena.drawFront(ctx,par);
  ctx.setTransform(1,0,0,1,0,0);if(!Arena.lite)ctx.drawImage(Arena.vig,0,0);
 }
 let last=0,raf=0;
@@ -122,7 +122,7 @@ function flashScreen(){const f=$('hitFlash');f.classList.remove('go');void f.off
 
 /* ================= weapon picker: every round, both fighters choose their arms ================= */
 const PICK_TIME=12;
-const Picker={built:false,on:false,sel:null,locked:false,opp:false,tShown:-1,
+const Picker={used:new Set(),botUsed:new Set(),built:false,on:false,sel:null,locked:false,opp:false,tShown:-1,
  build(){if(this.built)return;this.built=true;const g=$('pkGrid');
   WEAPON_ORDER.forEach((id,n)=>{const w=WEAPONS[id],st=w.stats,b=document.createElement('button');b.type='button';b.className='pk-card';b.dataset.w=id;
    const cv=document.createElement('canvas');cv.width=220;cv.height=100;const c=cv.getContext('2d'),k=200/(w.len+34);c.translate(10+22*k,50);c.scale(k,k);DF.drawWeapon(c,id,'#f0d28a',0);
@@ -133,11 +133,11 @@ const Picker={built:false,on:false,sel:null,locked:false,opp:false,tShown:-1,
  show(round,foe){this.build();this.on=true;this.sel=null;this.locked=false;this.opp=false;this.tShown=-1;
   $('picker').hidden=false;$('picker').classList.remove('locked');$('pkSub').textContent='ROUND '+round+' \u00b7 vs '+foe;
   $('pkLock').disabled=true;$('pkLock').textContent='LOCK IN';
-  [...$('pkGrid').children].forEach(c=>c.classList.remove('sel'));this.status()},
+  [...$('pkGrid').children].forEach(c=>{c.classList.remove('sel');const u=this.used.has(c.dataset.w);c.classList.toggle('used',u);c.disabled=u});this.status()},
  hide(){this.on=false;$('picker').hidden=true},
- select(id){if(!this.on||this.locked)return;this.sel=id;[...$('pkGrid').children].forEach(c=>c.classList.toggle('sel',c.dataset.w===id));$('pkLock').disabled=false;SFX.init();SFX.ui()},
- lock(){if(!this.on||this.locked||!this.sel)return;this.locked=true;$('picker').classList.add('locked');$('pkLock').disabled=true;$('pkLock').textContent='LOCKED IN';this.status();Match.onMyPick(this.sel)},
- autoLock(){if(!this.on||this.locked)return;if(!this.sel)this.select(WEAPON_ORDER[(Math.random()*WEAPON_ORDER.length)|0]);this.lock()},
+ select(id){if(!this.on||this.locked||this.used.has(id))return;this.sel=id;[...$('pkGrid').children].forEach(c=>c.classList.toggle('sel',c.dataset.w===id));$('pkLock').disabled=false;SFX.init();SFX.ui()},
+ lock(){if(!this.on||this.locked||!this.sel)return;this.locked=true;this.used.add(this.sel);$('picker').classList.add('locked');$('pkLock').disabled=true;$('pkLock').textContent='LOCKED IN';this.status();Match.onMyPick(this.sel)},
+ autoLock(){if(!this.on||this.locked)return;if(!this.sel){const f=WEAPON_ORDER.filter(w=>!this.used.has(w));this.select(f[(Math.random()*f.length)|0])}this.lock()},
  setOpp(v){this.opp=v;this.status()},
  status(){const e=$('pkStatus');e.className=this.opp?'ok':'';e.textContent=this.locked?(this.opp?'BOTH LOCKED IN':'WAITING FOR OPPONENT\u2026'):(this.opp?'OPPONENT LOCKED IN \u2014 YOUR MOVE':'OPPONENT IS CHOOSING\u2026')},
  tick(t){const s=Math.max(0,Math.ceil(t));if(s===this.tShown)return;this.tShown=s;const e=$('pkTimer');e.textContent=s;e.classList.toggle('low',s<=3)}
@@ -149,15 +149,15 @@ addEventListener('keydown',e=>{if(!Picker.on||!Match.active||Match.paused)return
 const Match={
  active:false,mode:'bot',me:0,matchId:null,phase:'none',phaseT:0,round:1,score:[0,0],rand:null,picks:[null,null],pickT:0,botWait:0,names:['AFTAB','ASHEN WARDEN'],
  p1:new DF.Fighter(0,'P1'),p2:new DF.Fighter(1,'P2'),bot:null,timeLeft:60,hitstop:0,slow:0,paused:false,netT:0,inT:0,lastIn:'',remote:{l:0,r:0,j:0,a:0,d:0,h:0},seen:[[0,0,0,0,0],[0,0,0,0,0]],ended:false,koShown:false,
- start(o){this.mode=o.mode;this.me=o.mode==='guest'?1:0;this.matchId=o.matchId||((crypto&&crypto.randomUUID)?crypto.randomUUID():'m_'+Date.now()+'_'+Math.random().toString(36).slice(2));this.names=o.names;this.p1.name=o.names[0];this.p2.name=o.names[1];const localMods=DF.Progression?DF.Progression.combat():{};this.p1.mods=this.me===0?localMods:(this.p1.mods||{});this.p2.mods=this.me===1?localMods:(this.p2.mods||{});
+ start(o){DF.Match=this;setTimeout(()=>DF.Ov&&DF.Ov.onStart(),0);this.mode=o.mode;this.me=o.mode==='guest'?1:0;this.matchId=o.matchId||((crypto&&crypto.randomUUID)?crypto.randomUUID():'m_'+Date.now()+'_'+Math.random().toString(36).slice(2));this.names=o.names;this.p1.name=o.names[0];this.p2.name=o.names[1];const localMods=DF.Progression?DF.Progression.combat():{};this.p1.mods=this.me===0?localMods:(this.p1.mods||{});this.p2.mods=this.me===1?localMods:(this.p2.mods||{});
   let s=(o.seed>>>0)||1;this.rand=()=>{s=(s+0x6D2B79F5)|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
-  Picker.hide();Input.step=0;this.score=[0,0];this.round=1;this.picks=[null,null];this.bot=o.mode==='bot'?new DF.Bot(1):null;this.paused=false;this.ended=false;this.remote={l:0,r:0,j:0,a:0,d:0,h:0,st:0};this.seen=[[0,0,0,0,0],[0,0,0,0,0]];
+  Picker.hide();Picker.used.clear();Picker.botUsed.clear();Input.step=0;this.score=[0,0];this.round=1;this.picks=[null,null];this.bot=o.mode==='bot'?new DF.Bot(1):null;this.paused=false;this.ended=false;this.remote={l:0,r:0,j:0,a:0,d:0,h:0,st:0};this.seen=[[0,0,0,0,0],[0,0,0,0,0]];
   this.hitstop=0;this.slow=0;cam.z=1;FX.reset();qual=Math.max(qual,baseQual());applyGfx();$('pauseMenu').hidden=true;
   $('heroName').textContent=this.names[0];$('enemyName').textContent=this.names[1]+(o.mode==='guest'?' (YOU)':'');
   for(const k in hudCache)delete hudCache[k];setPips('hero',0);setPips('enemy',0);$('myRounds').textContent=$('botRounds').textContent='0';
   show('duel');this.active=true;Input.clear();resize();last=performance.now();cancelAnimationFrame(raf);raf=requestAnimationFrame(frame);
   SFX.init();SFX.resume();if(o.mode!=='guest')this.beginRound()},
- rollWeapon(){return WEAPON_ORDER[(Math.random()*WEAPON_ORDER.length)|0]},
+ rollWeapon(who){const u=who===1?Picker.botUsed:Picker.used;let f=WEAPON_ORDER.filter(w=>!u.has(w));if(!f.length){u.clear();f=WEAPON_ORDER}const w=f[(Math.random()*f.length)|0];if(who===1)u.add(w);return w},
  /* bot / host: open the weapon-pick phase. Picks are hidden until both fighters lock in, then revealed together. */
  beginRound(){this.picks=[null,null];this.enterPick();
   if(this.mode==='host')Net.send({t:'pstart',n:this.round,sc:this.score});
@@ -169,10 +169,10 @@ const Match={
  onMyPick(id){if(this.mode==='guest')Net.send({t:'pick',n:this.round,w:id});else{this.picks[0]=id;if(this.mode==='host')Net.send({t:'lock'})}},
  setRemotePick(id){if(this.phase==='pick'&&WEAPONS[id]&&!this.picks[1]){this.picks[1]=id;Picker.setOpp(true)}},
  pickStep(dt){this.pickT-=dt;Picker.tick(this.pickT);
-  if(this.mode==='bot'&&!this.picks[1]){this.botWait-=dt;if(this.botWait<=0){this.picks[1]=this.rollWeapon();Picker.setOpp(true)}}
+  if(this.mode==='bot'&&!this.picks[1]){this.botWait-=dt;if(this.botWait<=0){this.picks[1]=this.rollWeapon(1);Picker.setOpp(true)}}
   if(this.pickT<=0&&!Picker.locked)Picker.autoLock();
   if(this.mode!=='guest'&&((this.picks[0]&&this.picks[1])||this.pickT<=-1.2))this.resolvePick()},
- resolvePick(){const a=this.picks[0]||this.rollWeapon(),b=this.picks[1]||this.rollWeapon();this.applyRound(a,b);
+ resolvePick(){const a=this.picks[0]||this.rollWeapon(),b=this.picks[1]||this.rollWeapon(1);this.applyRound(a,b);
   if(this.mode==='host')Net.send({t:'round',n:this.round,w:[a,b],sc:this.score})},
  applyRound(a,b){const w1=WEAPONS[a],w2=WEAPONS[b];this.p1.reset(300,1,w1);this.p2.reset(660,-1,w2);this.phase='intro';this.phaseT=0;this.timeLeft=60;this.koShown=false;this.slow=0;Picker.hide();
   FX.reset();Input.clear();
@@ -198,7 +198,7 @@ const Match={
  /* ---- gameplay callbacks (called by Fighter) ---- */
  onJump(f){FX.dust(f.x,412,4);SFX.jump()},onLand(f){FX.dust(f.x,412,5)},onDash(f){FX.dust(f.x,412,6,-f.dashDir);SFX.dash()},
  onAttackStart(f){if(f.atk&&f.atk.heavy)SFX.charge()},
-onPower(f,type,st){
+onPower(f,type,st){DF.Ov&&DF.Ov.power(f,type,st);
   if(this.mode==='host')Net.send({t:'power',s:f.side,x:Math.round(f.x),y:Math.round(f.y-70),type});
   FX.ring(f.x,f.y-70,f.pal.accent,type==='lightning'?110:70,.35);FX.sparks(f.x,f.y-65,f.facing,12,f.pal.accent,420);SFX.dash();FX.shake(type==='lightning'?3:1.5);
   if(type==='lightning'){
@@ -245,7 +245,7 @@ onPower(f,type,st){
    else if(this.timeLeft<=0){this.timeLeft=0;this.endRound(a.hp===b.hp?-1:a.hp>b.hp?0:1,false)}}},
  feed(f,st){f.input.left=!!st.l;f.input.right=!!st.r;const i=f.side,s=this.seen[i];
    if(st.j!==s[0]){s[0]=st.j;f.input.jump=.14}if(st.a!==s[1]){s[1]=st.a;f.input.attack=.14}if(st.d!==s[2]){s[2]=st.d;f.input.dash=.14}if(st.h!==s[3]){s[3]=st.h|0;f.input.heavy=.14}if(st.st!==undefined&&st.st!==s[4]){s[4]=st.st|0;f.input.step=.12}},
- update(dt){
+ update(dt){DF.Ov&&DF.Ov.update(dt);
   if(this.paused){return}
   this.phaseT+=dt;
   let sd=dt;if(this.hitstop>0){this.hitstop-=dt;sd=0}else if(this.slow>0){this.slow-=dt;sd=dt*.3}

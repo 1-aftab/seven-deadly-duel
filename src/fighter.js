@@ -36,7 +36,7 @@ class Fighter{
   const I=this.input,w=this.weapon;this.modeT+=dt;
   this.dashCd=Math.max(0,this.dashCd-dt);this.atkCd=Math.max(0,this.atkCd-dt);this.hvCd=Math.max(0,this.hvCd-dt);this.powerCd=Math.max(0,this.powerCd-dt);this.powerT=Math.max(0,this.powerT-dt);this.inv=Math.max(0,this.inv-dt);this.flash-=dt;this.landT-=dt;this.shakeT-=dt;
   I.jump=Math.max(0,I.jump-dt);I.attack=Math.max(0,I.attack-dt);I.dash=Math.max(0,I.dash-dt);I.heavy=Math.max(0,I.heavy-dt);
-  const dir=(I.right?1:0)-(I.left?1:0),mods=this.mods||{},armor=mods.armor||null,pow=mods.power||null,spd=WALK*w.speed*(1+(armor&&armor.stats.speed||0)+(pow&&pow.stats.speed||0)+(this.powerKind==='bloodrush'&&this.powerT>0?(pow&&pow.stats.speed||.28):0));
+  const dir=(I.right?1:0)-(I.left?1:0),mods=this.mods||{},armor=mods.armor||null,pow=mods.power||null,spd=WALK*w.speed*(1+Math.min(.4,Math.max(0,((this.runT=dir&&this.grounded?(this.runT||0)+dt:0)-.35))*.8))*(1+(armor&&armor.stats.speed||0)+(pow&&pow.stats.speed||0)+(this.powerKind==='bloodrush'&&this.powerT>0?(pow&&pow.stats.speed||.28):0));
   const faceOpp=()=>{const dx=opp.x-this.x;if(Math.abs(dx)>6)this.facing=dx>0?1:-1};
   const m=this.mode;
   if(m==='free'){

@@ -293,3 +293,28 @@ body.touch .pk-key{display:none}
 .item-icon{width:58px;height:58px;border-radius:16px;border:1px solid #6b5733;background:radial-gradient(circle at 35% 25%,#5a4630,#17110d 68%);display:grid;place-items:center;margin-bottom:9px;box-shadow:0 8px 22px #0006}.item-icon span{font-size:30px;filter:drop-shadow(0 2px 5px #000);color:#f0d28a}.store-item.owned .item-icon{border-color:#b28a3d}.profile-editor{margin:16px 0;padding:16px;border:1px solid var(--line);border-radius:16px;background:#130f0c}.profile-editor h3{margin:0 0 9px}.profile-editor h3+textarea{margin-bottom:14px}.profile-editor textarea{width:100%;min-height:100px;resize:vertical;padding:13px;border:1px solid var(--line);border-radius:12px;background:#0f0c09;color:var(--text);outline:none}.showcase-row{display:flex;gap:10px}.showcase-row select{flex:1;min-width:0;padding:12px;border:1px solid var(--line);border-radius:12px;background:#1b1510;color:var(--text)}.showcase-row .primary{white-space:nowrap}.showcase-card{display:flex!important;flex-direction:column;align-items:flex-start!important;gap:3px!important;border-color:#8a713a!important}.showcase-card small{color:var(--muted)}
 .friend-add{padding:16px;margin-bottom:16px}.friend-add h3{margin:0 0 10px}.friend-list{display:grid;gap:8px;margin-bottom:18px}.friend-row{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--line);border-radius:14px;background:#130f0c}.friend-row>div{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}.friend-row b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.friend-row small{color:var(--muted);font-size:10px}.friend-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.friend-actions button{padding:9px 10px;font-size:10px}.search-result{display:flex;align-items:center;gap:10px;margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:12px;background:#130f0c}.search-result b{flex:1}.search-result button{padding:9px 12px;font-size:10px}
 @media(max-width:560px){.showcase-row{flex-direction:column}.friend-actions{width:100%;justify-content:flex-start}.friend-row{align-items:flex-start;flex-wrap:wrap}.friend-row>.avatar{margin-top:2px}}
+
+/* --- weapon lock (used weapons are unavailable for the rest of the match) --- */
+.pk-card.used{opacity:.35;filter:grayscale(1);cursor:not-allowed;pointer-events:none;position:relative}
+.pk-card.used::after{content:"\1F512  USED";position:absolute;inset:auto 6px 6px auto;font:700 11px/1 serif;letter-spacing:.12em;color:#f0d28a;background:#000a;padding:4px 6px;border-radius:4px}
+/* --- graphics tiers --- */
+body[data-gfx="med"] .screen{backdrop-filter:none}
+body[data-gfx="high"] #duel canvas{filter:contrast(1.06) saturate(1.1) drop-shadow(0 0 12px #0008)}
+
+/* ===== FUTURISTIC THEME (v3) ===== */
+body,button,h1,h2,h3,b{font-family:'Orbitron','Segoe UI',system-ui,sans-serif!important;letter-spacing:.06em}
+.screen{background:radial-gradient(ellipse at 50% 0,#0d2a4a 0,#050a14 65%)!important;color:#d8f4ff}
+button{border-color:#39d0ff!important}
+button:not(.ov-x):hover{box-shadow:0 0 16px #39d0ff88}
+body:not(.lowfx) #duel canvas{filter:hue-rotate(155deg) saturate(1.35) contrast(1.08)}
+body[data-gfx="high"] #duel canvas{filter:hue-rotate(155deg) saturate(1.45) contrast(1.1) drop-shadow(0 0 14px #39d0ff55)}
+#ovDock{position:absolute;right:14px;bottom:14px;display:flex;gap:8px;z-index:5}
+#ovDock button,.ov-x{background:#06223acc;color:#bff4ff;border:1px solid #39d0ff;padding:10px 14px;border-radius:6px;font-size:12px;cursor:pointer}
+#ovModal{display:none;position:fixed;inset:0;z-index:999;background:#02060cdd;align-items:center;justify-content:center;padding:12px}
+.ov-box{background:linear-gradient(160deg,#08203a,#040a14);border:1px solid #39d0ff;border-radius:12px;box-shadow:0 0 40px #39d0ff44;max-width:560px;width:100%;max-height:92vh;overflow:auto;padding:16px;color:#d8f4ff;text-align:center}
+.ov-box h2{margin:0 0 12px;color:#7be3ff;font-size:16px}
+.ov-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px;margin-bottom:12px}
+.ov-card{background:#071a2e;color:#d8f4ff;border:1px solid #1d4e73;border-radius:8px;padding:10px 6px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer}
+.ov-card.on{border-color:#7be3ff!important;box-shadow:0 0 14px #39d0ffaa}
+.ov-card.wide{grid-column:1/-1;flex-direction:row;gap:10px;text-align:left;padding:12px}
+.ov-card small{font-size:10px;opacity:.7}.ov-card .sw{width:44px;height:44px;border-radius:50%}.ov-card .ic{font-size:26px;color:#7be3ff}
