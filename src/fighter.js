@@ -164,6 +164,14 @@ startPower(G,pow){this.input.heavy=0;const st=pow.stats||{},type=st.type||'';thi
   const R=this.rig,P=this.pose,pal=this.flash>0?PAL_FLASH:this.pal,w=this.weapon;
   const jx=this.shakeT>0?(Math.random()-.5)*5:0;
   c.save();c.translate(this.x+jx,this.y+this.yOff);c.scale(this.facing,1);
+  const B=this.pal.body||{},bs=B.s||1;if(bs!==1)c.scale(bs,bs);
+  {let sx=1,sy=1,rt=0,sh=0;const m=this.mode,at=this.atk;
+   if(!this.grounded&&m!=='ko'){const v=Math.min(1,Math.abs(this.vy)/1400);sy+=.12*v;sx-=.07*v}
+   else if(this.landT>0){const k=Math.min(1,this.landT/.12);sy-=.14*k;sx+=.1*k}
+   if(m==='dash'){rt=.2;sx*=1.14;sy*=.93;c.globalCompositeOperation='lighter';c.strokeStyle=this.pal.accent;c.lineWidth=2;c.globalAlpha=.5;for(let i=0;i<4;i++){c.beginPath();c.moveTo(-26-i*6,-30-i*18);c.lineTo(-70-i*10,-30-i*18);c.stroke()}c.globalAlpha=1;c.globalCompositeOperation='source-over'}
+   else if(m==='attack'&&at){if(at.phase===1){sh=.16;sx*=1.05}else if(at.phase===0){sy-=.05;sh=-.05}}
+   else if(this.grounded&&this.runT>.5){rt=.1;sh=.05}
+   if(m!=='ko'){c.rotate(rt);c.transform(sx,0,-sh,sy,0,0)}}
   if(this.rot){c.rotate(this.rot);c.translate(0,-7*Math.min(1,-this.rot))}
   c.lineCap='round';c.lineJoin='round';
   const chg=this.atk&&this.atk.heavy&&this.atk.phase===0;
@@ -179,20 +187,32 @@ startPower(G,pow){this.input.heavy=0;const st=pow.stats||{},type=st.type||'';thi
   if(!w.two){limb(R.sx,R.sy,R.ebx,R.eby,8,pal.dark);limb(R.ebx,R.eby,R.hbx,R.hby,7,pal.dark);c.fillStyle=pal.dark;c.beginPath();c.arc(R.hbx,R.hby,4.2,0,6.283);c.fill()}
   drawLeg(R.kbx,R.kby,R.fbx,R.fby,pal.dark,pal.armor);
   // torso
-  c.save();c.translate(R.hx,R.hy);c.rotate(P.lean);
+  c.save();c.translate(R.hx,R.hy);c.rotate(P.lean);c.scale(B.tw||1,1);
   c.fillStyle=pal.armor;c.beginPath();c.moveTo(-9,2);c.lineTo(9,2);c.quadraticCurveTo(14,-TORSO*.55,10,-TORSO+4);c.lineTo(-9,-TORSO+4);c.quadraticCurveTo(-13,-TORSO*.5,-9,2);c.fill();
   c.fillStyle=pal.armor2;c.globalAlpha=.7;c.fillRect(1,-TORSO+9,8,TORSO-20);c.globalAlpha=1;
   c.fillStyle=pal.cloth;c.beginPath();c.moveTo(-10,0);c.lineTo(10,0);c.lineTo(12,14);c.lineTo(0,18);c.lineTo(-12,13);c.closePath();c.fill();
   c.fillStyle=pal.trim;c.fillRect(-10,-8,20,3.5);c.beginPath();c.moveTo(3,-TORSO*.62);c.lineTo(7,-TORSO*.5);c.lineTo(3,-TORSO*.38);c.lineTo(-1,-TORSO*.5);c.closePath();c.fill();
+  if(B.pad){c.fillStyle=pal.armor2;c.beginPath();c.arc(0,-TORSO+8,B.pad,0,6.283);c.fill();c.strokeStyle=pal.trim;c.lineWidth=2;c.stroke()}
   c.restore();
   // head
-  c.save();c.translate(R.cx,R.cy);c.rotate(P.lean+P.head);
+  c.save();c.translate(R.cx,R.cy);c.rotate(P.lean+P.head);if(B.hs)c.scale(B.hs,B.hs);
   const px=this.cape.x*.35,py=this.cape.y*.12;
   c.strokeStyle=pal.trim;c.lineWidth=4;c.beginPath();c.moveTo(-3,-HEADR+1);c.quadraticCurveTo(-10+px*.4,-HEADR-8,-16+px,-HEADR+3+py*.3);c.stroke();
   c.fillStyle=pal.armor;c.beginPath();c.arc(0,0,HEADR,0,6.283);c.fill();
   c.fillStyle=pal.armor2;c.beginPath();c.arc(0,0,HEADR,-2.9,-.9);c.lineTo(0,0);c.fill();
   c.fillStyle=pal.dark;c.beginPath();c.moveTo(1,-5);c.lineTo(HEADR+.5,-3);c.lineTo(HEADR-1,3);c.lineTo(1,4);c.closePath();c.fill();
   c.fillStyle=pal.trim;c.fillRect(4,-2.4,HEADR-3,2.6);
+  {const a=B.acc,R2=HEADR,fl=(pts,col)=>{c.fillStyle=col||pal.trim;c.beginPath();pts.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));c.closePath();c.fill()};
+   if(a==='hood'){c.fillStyle=pal.cape;c.beginPath();c.arc(-1,-1,R2+3,2.2,6.1);c.lineTo(-8,R2);c.fill()}
+   else if(a==='crown')fl([[-8,-R2+2],[-9,-R2-10],[-3,-R2-3],[1,-R2-13],[5,-R2-3],[10,-R2-9],[9,-R2+2]]);
+   else if(a==='horns'){fl([[-6,-R2+3],[-14,-R2-14],[-1,-R2]],pal.metal);fl([[3,-R2+1],[12,-R2-13],[8,-R2+3]],pal.metal)}
+   else if(a==='spikes')for(let i=0;i<4;i++)fl([[-8+i*4,-R2+2],[-12+i*5,-R2-14],[-4+i*4,-R2+1]],pal.accent);
+   else if(a==='helm'){c.fillStyle=pal.armor2;c.beginPath();c.arc(0,-1,R2+2,3.3,6.1);c.fill();fl([[-3,-R2-2],[1,-R2-11],[5,-R2-2]],pal.trim)}
+   else if(a==='hat'){fl([[-14,-R2+3],[14,-R2+3],[3,-R2-4],[-2,-R2-26]],pal.cape);c.fillStyle=pal.trim;c.fillRect(-14,-R2+1,28,3)}
+   else if(a==='visor'){c.fillStyle=pal.accent;c.globalAlpha=.9;c.fillRect(0,-4,R2+2,4);c.globalAlpha=1}
+   else if(a==='band'){c.fillStyle=pal.accent;c.fillRect(-R2,-R2*.45,R2*2,4);fl([[-R2,-R2*.45],[-R2-14,-R2*.2],[-R2-12,-R2*.7]],pal.accent)}
+   else if(a==='beak')fl([[R2-2,-2],[R2+11,2],[R2-2,6]],pal.accent);
+   else if(a==='halo'){c.strokeStyle=pal.accent;c.lineWidth=2.5;c.globalAlpha=.9;c.beginPath();c.ellipse(-2,-R2-9,12,4,0,0,6.283);c.stroke();c.globalAlpha=1}}
   c.restore();
   drawLeg(R.kfx,R.kfy,R.ffx,R.ffy,pal.armor,pal.armor2);
   // weapon (grip -> blade), glow while swinging

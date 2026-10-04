@@ -438,7 +438,7 @@ $('shareCode').onclick=async()=>{if(navigator.share){try{await navigator.share({
 
 DF.hostRoomForFriend=async friendId=>{if(!DF.Net?.supported())throw Error('Online play is not supported in this browser.');wireNet();busy(true);const code=await Net.host();await DF.Progression.createDuelRequest?.(friendId,code);busy(false);showRoom(code,true);show('room');return code};
 DF.joinRoomFromFriend=async code=>{if(!DF.Net?.supported())throw Error('Online play is not supported in this browser.');wireNet();busy(true);await Net.join(String(code));busy(false);showRoom(String(code),false);show('room')};
-function onNet(m){
+function onNet(m){if(m&&m.t==='ovpow'){DF.Ov&&DF.Ov.recv(m);return}
  switch(m.t){
   case'hello':remoteName=String(m.name||'OPPONENT').slice(0,14);if(m.mods)Match.p2.mods=m.mods;
    if(Net.role==='host'){setSlot(2,remoteName,'GUEST',true);roomMsg('Opponent joined! Starting…',false);clearTimeout(roomT);
@@ -453,7 +453,7 @@ function onNet(m){
   case'ph':if(Match.mode!=='guest')break;if(m.ph==='fight')Match.startFight();else if(m.ph==='ko'){Match.score=m.sc;Match.round=m.r;Match.slow=m.ko?.9:0;Match.phase='fight';Match.showRoundEnd(m.w,!!m.ko)}break;
   case's':if(Match.mode==='guest'&&Match.active){Match.p1.applySnap(m.a,Match);Match.p2.applySnap(m.b,Match);Match.timeLeft=m.tm}break;
   case'hit':if(Match.mode==='guest'&&Match.active)Match.fxHit(m.s,m.x,m.y,m.g||(m.s?Match.p2:Match.p1).weapon.dmg,!!m.k,m.d,!!m.v);break;
-   case'power':if(Match.mode==='guest'&&Match.active){const pf=m.s===0?Match.p1:Match.p2;FX.ring(m.x,m.y,pf.pal.accent,m.type==='lightning'?110:70,.35);FX.sparks(m.x,m.y,pf.facing,12,pf.pal.accent,420);SFX.dash();}break;
+   case'power':if(Match.mode==='guest'&&Match.active){const pf=m.s===0?Match.p1:Match.p2;FX.ring(m.x,m.y,pf.pal.accent,m.type==='lightning'?110:70,.35);FX.sparks(m.x,m.y,pf.facing,12,pf.pal.accent,420);SFX.dash();DF.Ov&&DF.Ov.power(pf,m.type,null,true);}break;
   case'powerHit':if(Match.mode==='guest'&&Match.active){const df=m.s===0?Match.p2:Match.p1;df.hp=Math.max(0,df.hp-(m.d|0));if(m.k)df.die(m.dir||1,80);else df.hurt(m.dir||1,80,60,.24);Match.fxHit(m.s,m.x,m.y,m.d|0,!!m.k,m.dir||1,true);}break;
   case'rematch':if(Match.rematchFlags){Match.rematchFlags.opp=true;tryRematch()}break;
   case'quit':if(Match.active&&Match.mode!=='bot'){banner('OPPONENT LEFT','','end');setTimeout(()=>{Match.active=false;Net.close();show('home')},1800)}

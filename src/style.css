@@ -318,3 +318,9 @@ body[data-gfx="high"] #duel canvas{filter:hue-rotate(155deg) saturate(1.45) cont
 .ov-card.on{border-color:#7be3ff!important;box-shadow:0 0 14px #39d0ffaa}
 .ov-card.wide{grid-column:1/-1;flex-direction:row;gap:10px;text-align:left;padding:12px}
 .ov-card small{font-size:10px;opacity:.7}.ov-card .sw{width:44px;height:44px;border-radius:50%}.ov-card .ic{font-size:26px;color:#7be3ff}
+/* polish */
+button{transition:transform .12s,box-shadow .2s}button:active{transform:scale(.96)}
+.screen.active{animation:ovIn .35s ease}@keyframes ovIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.screen::before{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,#39d0ff08 0 1px,transparent 1px 3px);z-index:0}
+body.lowfx .screen::before{display:none}
+#ovDock{flex-wrap:wrap;justify-content:flex-end}
